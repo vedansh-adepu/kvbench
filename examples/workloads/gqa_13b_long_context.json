@@ -1,0 +1,24 @@
+{
+  "model": {
+    "name": "gqa-13b-like",
+    "layers": 40,
+    "attention_heads": 40,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "hidden_size": 5120,
+    "dtype": "bf16"
+  },
+  "workload": {
+    "context_tokens": 32768,
+    "decode_tokens": 1024,
+    "concurrent_requests": 8,
+    "batch_size": 8,
+    "prefill_chunk_size": 2048
+  },
+  "system": {
+    "gpu_memory_gb": 48,
+    "reserved_memory_gb": 5,
+    "kv_quantization": "fp16",
+    "page_size_tokens": 16
+  }
+}

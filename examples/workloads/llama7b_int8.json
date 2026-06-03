@@ -1,0 +1,24 @@
+{
+  "model": {
+    "name": "llama-7b-like-int8-kv",
+    "layers": 32,
+    "attention_heads": 32,
+    "kv_heads": 32,
+    "head_dim": 128,
+    "hidden_size": 4096,
+    "dtype": "fp16"
+  },
+  "workload": {
+    "context_tokens": 8192,
+    "decode_tokens": 512,
+    "concurrent_requests": 16,
+    "batch_size": 16,
+    "prefill_chunk_size": 1024
+  },
+  "system": {
+    "gpu_memory_gb": 24,
+    "reserved_memory_gb": 3,
+    "kv_quantization": "int8",
+    "page_size_tokens": 16
+  }
+}
