@@ -19,7 +19,7 @@ It is a planning tool, not an inference engine. It does not load model weights, 
 
 Requirements:
 
-- CMake 3.16 or newer
+- CMake 3.20 or newer
 - C++20 compiler
 
 ```sh

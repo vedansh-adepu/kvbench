@@ -1,36 +1,83 @@
-cmake_minimum_required(VERSION 3.16)
-
-project(kvbench VERSION 0.1.0 LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.20)
+project(kvbench VERSION 1.0.0 LANGUAGES CXX)
+set(KVBENCH_VERSION "${PROJECT_VERSION}rc1")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+option(KVBENCH_WARNINGS_AS_ERRORS "Treat project warnings as errors" OFF)
+option(KVBENCH_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
+option(KVBENCH_COVERAGE "Enable compiler coverage instrumentation" OFF)
+option(KVBENCH_FUZZ "Build Clang libFuzzer targets (added in hardening phase)" OFF)
 
-add_library(kvbench_core
-  src/config.cpp
-  src/estimator.cpp
-  src/json.cpp
-  src/scheduler.cpp
-)
+include(FetchContent)
+if(POLICY CMP0135)
+  cmake_policy(SET CMP0135 NEW)
+endif()
+# Tag-qualified archives are verified against their exact SHA256 digest.
+FetchContent_Declare(json
+  URL https://codeload.github.com/nlohmann/json/tar.gz/refs/tags/v3.12.0
+  URL_HASH SHA256=4b92eb0c06d10683f7447ce9406cb97cd4b453be18d7279320f7b2f025c10187)
+FetchContent_Declare(cli11
+  URL https://codeload.github.com/CLIUtils/CLI11/tar.gz/refs/tags/v2.5.0
+  URL_HASH SHA256=17e02b4cddc2fa348e5dbdbb582c59a3486fa2b2433e70a0c3bacb871334fd55)
+FetchContent_Declare(catch2
+  URL https://codeload.github.com/catchorg/Catch2/tar.gz/refs/tags/v3.8.1
+  URL_HASH SHA256=18b3f70ac80fccc340d8c6ff0f339b2ae64944782f8d2fca2bd705cf47cadb79)
+if(FETCHCONTENT_FULLY_DISCONNECTED)
+  foreach(dependency IN ITEMS JSON CLI11 CATCH2)
+    string(TOLOWER "${dependency}" dependency_lower)
+    if(NOT EXISTS "${FETCHCONTENT_SOURCE_DIR_${dependency}}/CMakeLists.txt"
+        AND NOT EXISTS "${FETCHCONTENT_BASE_DIR}/${dependency_lower}-src/CMakeLists.txt")
+      message(FATAL_ERROR "Offline build needs populated ${dependency} sources: set FETCHCONTENT_SOURCE_DIR_${dependency}")
+    endif()
+  endforeach()
+endif()
+FetchContent_MakeAvailable(json cli11 catch2)
+configure_file(cmake/version.hpp.in generated/kvbench/version.hpp @ONLY)
 
-target_include_directories(kvbench_core PUBLIC include)
+function(kvbench_options target)
+  target_compile_options(${target} PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall;-Wextra;-Wpedantic;-Wconversion;-Wsign-conversion;-Wshadow>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4>)
+  if(KVBENCH_WARNINGS_AS_ERRORS)
+    target_compile_options(${target} PRIVATE
+      $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Werror>
+      $<$<CXX_COMPILER_ID:MSVC>:/WX>)
+  endif()
+  if(KVBENCH_SANITIZERS)
+    if(MSVC)
+      message(FATAL_ERROR "Combined ASan/UBSan preset requires GCC or Clang")
+    endif()
+    target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer)
+    target_link_options(${target} PRIVATE -fsanitize=address,undefined -fno-sanitize-recover=all)
+  endif()
+  if(KVBENCH_COVERAGE)
+    if(MSVC)
+      message(FATAL_ERROR "Coverage preset requires GCC or Clang")
+    endif()
+    target_compile_options(${target} PRIVATE --coverage -O0 -g)
+    target_link_options(${target} PRIVATE --coverage)
+  endif()
+endfunction()
 
-target_compile_options(kvbench_core PRIVATE
-  $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic>
-)
-
+add_library(kvbench_core src/config.cpp src/estimator.cpp src/json.cpp src/scheduler.cpp)
+target_include_directories(kvbench_core PUBLIC include "${CMAKE_CURRENT_BINARY_DIR}/generated")
+target_link_libraries(kvbench_core PUBLIC nlohmann_json::nlohmann_json)
+kvbench_options(kvbench_core)
 add_executable(kvbench src/main.cpp)
-target_link_libraries(kvbench PRIVATE kvbench_core)
-target_compile_options(kvbench PRIVATE
-  $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic>
-)
-
-enable_testing()
-
-add_executable(kvbench_tests tests/test_kvbench.cpp)
-target_link_libraries(kvbench_tests PRIVATE kvbench_core)
-target_compile_options(kvbench_tests PRIVATE
-  $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic>
-)
-
-add_test(NAME kvbench_tests COMMAND kvbench_tests)
+target_link_libraries(kvbench PRIVATE kvbench_core CLI11::CLI11)
+kvbench_options(kvbench)
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(kvbench_tests tests/test_kvbench.cpp)
+  target_link_libraries(kvbench_tests PRIVATE kvbench_core Catch2::Catch2WithMain)
+  kvbench_options(kvbench_tests)
+  list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
+  include(Catch)
+  catch_discover_tests(kvbench_tests)
+  add_test(NAME cli-version COMMAND kvbench version)
+  set_tests_properties(cli-version PROPERTIES PASS_REGULAR_EXPRESSION "kvbench ${KVBENCH_VERSION}")
+endif()
+install(TARGETS kvbench RUNTIME DESTINATION bin)

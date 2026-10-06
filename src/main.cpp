@@ -5,11 +5,12 @@
 #include <vector>
 
 #include "kvbench/config.hpp"
+#include "kvbench/version.hpp"
 #include "kvbench/estimator.hpp"
 
 namespace {
 
-constexpr const char* kVersion = "0.1.0";
+constexpr auto kVersion = kvbench::version;
 
 struct Args {
   std::vector<std::string> values;

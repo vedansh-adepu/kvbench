@@ -1,6 +1,6 @@
 #include <cmath>
 #include <exception>
-#include <iostream>
+#include <catch2/catch_test_macros.hpp>
 #include <string>
 
 #include "kvbench/config.hpp"
@@ -9,13 +9,9 @@
 
 namespace {
 
-int failures = 0;
-
 void check(bool condition, const std::string& message) {
-  if (!condition) {
-    std::cerr << "FAIL: " << message << "\n";
-    ++failures;
-  }
+  INFO(message);
+  REQUIRE(condition);
 }
 
 kvbench::Config sample_config(const std::string& quantization = "fp16") {
@@ -83,21 +79,8 @@ void test_format_outputs() {
 
 }  // namespace
 
-int main() {
-  try {
-    test_dtype_bytes();
-    test_estimate_formula();
-    test_quantization_reduces_kv();
-    test_scheduler();
-    test_format_outputs();
-  } catch (const std::exception& error) {
-    std::cerr << "unhandled exception: " << error.what() << "\n";
-    return 1;
-  }
-  if (failures != 0) {
-    std::cerr << failures << " test failure(s)\n";
-    return 1;
-  }
-  std::cout << "all tests passed\n";
-  return 0;
-}
+TEST_CASE("Legacy dtype byte widths") { test_dtype_bytes(); }
+TEST_CASE("Legacy estimator formula") { test_estimate_formula(); }
+TEST_CASE("Legacy quantization ordering") { test_quantization_reduces_kv(); }
+TEST_CASE("Legacy scheduler smoke") { test_scheduler(); }
+TEST_CASE("Legacy output formatting") { test_format_outputs(); }
