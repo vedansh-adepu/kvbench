@@ -1,92 +1,62 @@
 # kvbench
 
-kvbench is a C++ LLM inference capacity simulator that estimates KV-cache memory growth, batching pressure, quantization tradeoffs, decode-time load, and OOM risk from model and workload configs.
+A scriptable C++20 LLM inference capacity planner for KV-cache budgets and
+continuous-batching workloads. It is a planning model, not an inference engine
+or a hardware benchmark. Calibration evidence is pending.
 
-It is a planning tool, not an inference engine. It does not load model weights, run kernels, call model APIs, or require API keys.
+## Why I built it
 
-## Features
+I needed to size KV-cache capacity before provisioning GPUs, and the math I kept
+redoing by hand belonged in a tool. kvbench generalizes the capacity math behind
+right-sizing max_model_len in production.
 
-- Simulate KV-cache growth for model and workload JSON configs
-- Estimate prefill and decode memory pressure
-- Compare KV quantization choices: `fp32`, `fp16`, `bf16`, `int8`, `int4`
-- Check whether a workload fits a memory budget
-- Sweep batch and concurrency ranges
-- Compare multiple workloads
-- Emit text, JSON, Markdown, CSV, and Mermaid outputs
-- Run a deterministic request scheduler for arrival-based workloads
+## Build and quickstart
 
-## Build
-
-Requirements:
-
-- CMake 3.20 or newer
-- C++20 compiler
+Use CMake 3.20+, a C++20 compiler and Ninja for the presets. Dependencies are
+pinned archives; see [offline builds](docs/build.md). Illustrative commands:
 
 ```sh
-cmake -S . -B build
-cmake --build build
-ctest --test-dir build --output-on-failure
+cmake --preset release
+cmake --build --preset release
+ctest --preset release
+./build-release/kvbench version
+./build-release/kvbench simulate --config examples/workloads/llama7b_chat.json --format json
+./build-release/kvbench budget --config examples/workloads/llama7b_chat.json --max-memory-gib 80 --format json
+./build-release/kvbench schedule --config examples/workloads/scheduled_burst.json --format json
 ```
 
-## Usage
+Existing examples are schema-v1 compatibility fixtures and emit deprecation
+warnings. Prefer schema v2 with explicit checkpoint weights and runtime overheads.
+See [configuration](docs/config-reference.md) and [migration](docs/migration.md).
 
-```sh
-./build/kvbench simulate --config examples/workloads/llama7b_chat.json
-./build/kvbench simulate --config examples/workloads/llama7b_chat.json --format json
-./build/kvbench simulate --config examples/workloads/llama7b_chat.json --format markdown
-./build/kvbench compare examples/workloads/*.json
-./build/kvbench budget --config examples/workloads/llama7b_chat.json --max-memory-gb 24
-./build/kvbench sweep --config examples/workloads/llama7b_chat.json --batch-min 1 --batch-max 64
-./build/kvbench sweep --config examples/workloads/llama7b_chat.json --batch-min 1 --batch-max 64 --format csv
-./build/kvbench graph --config examples/workloads/llama7b_chat.json --format mermaid
-./build/kvbench version
-```
+## What it models
 
-## Config format
+- Standard MHA/GQA/MQA, latent MLA, sliding-window and hybrid layer cache bytes.
+- Packed dtypes and configurable per-tensor, per-token-head or group metadata.
+- Weights (explicit or estimated) and separate runtime/activation/graph allowances.
+- Whole-block budgets, phase-correct static paging and uncapped capacity math.
+- Decode-first continuous batching, chunked prefill, recompute preemption and arrivals.
 
-```json
-{
-  "model": {
-    "name": "llama-7b-like",
-    "layers": 32,
-    "attention_heads": 32,
-    "kv_heads": 32,
-    "head_dim": 128,
-    "hidden_size": 4096,
-    "dtype": "fp16"
-  },
-  "workload": {
-    "context_tokens": 8192,
-    "decode_tokens": 512,
-    "concurrent_requests": 16,
-    "batch_size": 16,
-    "prefill_chunk_size": 1024
-  },
-  "system": {
-    "gpu_memory_gb": 24,
-    "reserved_memory_gb": 3,
-    "kv_quantization": "fp16",
-    "page_size_tokens": 16
-  }
-}
-```
+Use `budget`, `simulate`, `schedule`, `sweep`, `compare`, `graph`, `version` and
+`completion`; see [CLI](docs/cli.md). JSON results carry `kvbench_result: 2`.
+Memory fields use bytes, with GiB inputs named explicitly. Events stream to
+JSONL only when requested and are never retained as a history by the scheduler.
 
-Scheduler workloads can provide request arrivals:
+## How it works
 
-```json
-{
-  "model": { "name": "llama-7b-like", "layers": 32, "attention_heads": 32, "kv_heads": 32, "head_dim": 128, "hidden_size": 4096, "dtype": "fp16" },
-  "system": { "gpu_memory_gb": 24, "reserved_memory_gb": 3, "kv_quantization": "fp16", "page_size_tokens": 16 },
-  "requests": [
-    {"id": "r1", "arrival_ms": 0, "input_tokens": 2048, "output_tokens": 256},
-    {"id": "r2", "arrival_ms": 10, "input_tokens": 8192, "output_tokens": 512}
-  ]
-}
-```
+The [shared memory model](docs/model.md), [weights/static model](docs/static-model.md),
+[budget](docs/budget.md) and [scheduler](docs/scheduler.md) document the code's
+formulas and assumptions. Arrival simulation remains separate from static
+worst-case output; neither is presented as measured throughput.
 
-## Model assumptions
+## Limitations
 
-The formulas are documented in [docs/model.md](docs/model.md). Throughput pressure is a heuristic score for comparison only. It is not a hardware benchmark.
+- Runtime and time-model defaults are UNCALIBRATED; no real vLLM accuracy evidence yet.
+- Hybrid cache-group padding and backend-specific physical layouts are not reproduced.
+- MLA weights require explicit checkpoint size; cache dimensions do not determine weights.
+- No prefix sharing, speculative decoding, distributed serving or kernel execution.
+- Remote CI, coverage and sanitizer/fuzz/static-analysis gates are not yet verified.
+- The import/calibration commands, generated results and benchmarks are upcoming phases.
 
 ## License
 

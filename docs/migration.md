@@ -3,8 +3,8 @@
 A document without `schema_version` is v1. The planner loader returns a
 schema-v2 config and a deprecation warning; unknown v1 fields produce warnings
 and are ignored. V2 unknown fields are errors. Warnings are returned by the
-library; the migrated CLI prints them to stderr. Existing prototype commands
-remain transitional until the CLI migration phase.
+library; the CLI prints them to stderr. Prototype Python/C++ types and coupled
+batch sweep flags are removed; v1 file compatibility remains.
 
 | v1 field | v2 mapping |
 | --- | --- |
@@ -29,5 +29,4 @@ instead; the compatibility mapping is not an engine-accuracy claim.
 
 Prefer explicit checkpoint weights and independently measured runtime overheads
 in v2. Do not carry the old reserved amount over and also subtract weights a
-second time. The model/cache math, schema and CLI are evolving on the work
-branch; release documentation will describe the final supported commands.
+second time. Use [CLI reference](cli.md) for commands, versioned output and exit codes.

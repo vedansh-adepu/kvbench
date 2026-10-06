@@ -22,12 +22,4 @@ Json parse_json(const std::string& source) {
     throw JsonError("invalid JSON syntax, encoding or numeric range");
   }
 }
-std::string escape_json_string(const std::string& input) {
-  try {
-    const std::string quoted = Json(input).dump();
-    return quoted.substr(1, quoted.size() - 2);
-  } catch (const Json::exception&) {
-    throw JsonError("invalid UTF-8 in output label");
-  }
-}
 }

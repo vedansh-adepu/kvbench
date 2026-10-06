@@ -2,8 +2,6 @@
 #include "kvbench/json.hpp"
 
 #include <limits>
-#include "kvbench/config.hpp"
-#include "kvbench/estimator.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -134,19 +132,19 @@ TEST_CASE("Legacy compatibility rejects fractional integers and huge dimensions"
   using namespace kvbench;
   const auto value = GENERATE(Json(8.9), Json(-0.5), Json(2147483648ULL), Json(0), Json("8"));
   Json source = {{"model", {{"layers", 1}, {"attention_heads", 1}, {"head_dim", 1}, {"kv_heads", value}}}, {"workload", {{"context_tokens", 1}}}};
-  REQUIRE_THROWS(parse_config_text(source.dump(), "test"));
+  REQUIRE_THROWS(parse_planner_config(source.dump()));
   source["model"]["kv_heads"] = 1;
   source["system"] = false;
-  REQUIRE_THROWS(parse_config_text(source.dump(), "test"));
+  REQUIRE_THROWS(parse_planner_config(source.dump()));
   source["system"] = Json::object();
   source["model"]["attention_heads"] = 2147483647;
   source["model"]["head_dim"] = 2147483647;
-  REQUIRE_THROWS(parse_config_text(source.dump(), "test"));
+  REQUIRE_THROWS(parse_planner_config(source.dump()));
   source["model"]["attention_heads"] = 1;
   source["model"]["head_dim"] = 1;
-  auto c = parse_config_text(source.dump(), "test");
-  c.system.gpu_memory_gb = std::numeric_limits<double>::infinity();
-  REQUIRE_THROWS(estimate(c));
+  auto c = parse_planner_config(source.dump());
+  c.engine.gpu_memory_utilization = std::numeric_limits<double>::infinity();
+  REQUIRE_THROWS(validate_planner_config(c));
 }
 
 TEST_CASE("Explicit zero dimensions are never interpreted as missing", "[config]") {

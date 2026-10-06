@@ -1,8 +1,7 @@
 # Cache memory model
 
 The checked shared memory API is `include/kvbench/memory.hpp`, implemented in
-`src/memory.cpp`. P1 establishes this API; the prototype CLI is not yet migrated
-to it. All memory results are whole bytes (`uint64_t`), never floating GiB.
+`src/memory.cpp`. The CLI uses this shared API. All memory results are whole bytes (`uint64_t`), never floating GiB.
 Presentation conversions use GiB = 2^30 bytes; decimal GB = 10^9 bytes.
 The [prototype model](history/prototype-model.md) describes the old CLI only.
 

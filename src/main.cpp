@@ -1,173 +1,123 @@
-#include <exception>
-#include <cmath>
-#include <limits>
-#include <sstream>
-#include <iomanip>
 #include <CLI/CLI.hpp>
+#include <cmath>
+#include <fstream>
+#include <filesystem>
 #include <iostream>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include "kvbench/config.hpp"
+#include <optional>
+#include <stdexcept>
+#include "kvbench/output.hpp"
 #include "kvbench/version.hpp"
-#include "kvbench/estimator.hpp"
 
 namespace {
-
-constexpr auto kVersion = kvbench::version;
-
-struct Args {
-  std::vector<std::string> values;
-
-  bool has(const std::string& flag) const {
-    for (const auto& value : values) {
-      if (value == flag) return true;
-    }
-    return false;
-  }
-
-  std::string get(const std::string& flag, const std::string& fallback = "") const {
-    for (std::size_t i = 0; i + 1 < values.size(); ++i) {
-      if (values[i] == flag) return values[i + 1];
-    }
-    return fallback;
-  }
-};
-
-[[noreturn]] void usage_error(const std::string& message) {
-  throw std::runtime_error(message + "\nRun 'kvbench help' for usage.");
+kvbench::PlannerConfig load(const std::string& path) {
+  auto c = kvbench::load_planner_config(path);
+  for (const auto& warning : c.warnings) std::cerr << "warning: " << warning << '\n';
+  return c;
 }
-
-int run_simulate(const Args& args) {
-  const std::string path = args.get("--config");
-  if (path.empty()) usage_error("simulate requires --config");
-  const std::string format = args.get("--format", "text");
-  const kvbench::Estimate estimate = kvbench::estimate(kvbench::load_config_file(path));
-  if (format == "text") std::cout << kvbench::format_text_report(estimate);
-  else if (format == "json") std::cout << kvbench::format_json_report(estimate);
-  else if (format == "markdown") std::cout << kvbench::format_markdown_report(estimate);
-  else usage_error("unsupported simulate format: " + format);
-  return 0;
+CLI::Validator unsigned_integer() {
+  return CLI::Validator([](std::string& value) {
+    return value.empty() || value.find_first_not_of("0123456789") != std::string::npos ? std::string("expected unsigned integer") : std::string{};
+  }, "UINT64");
 }
-
-int run_compare(const Args& args) {
-  std::vector<std::pair<std::string, kvbench::Estimate>> estimates;
-  for (std::size_t i = 1; i < args.values.size(); ++i) {
-    if (!args.values[i].empty() && args.values[i][0] == '-') continue;
-    estimates.push_back({args.values[i], kvbench::estimate(kvbench::load_config_file(args.values[i]))});
-  }
-  if (estimates.empty()) usage_error("compare requires one or more config files");
-  std::cout << kvbench::format_compare_table(estimates);
-  return 0;
 }
-
-int run_budget(const Args& args) {
-  const std::string path = args.get("--config");
-  const std::string max_memory = args.get("--max-memory-gb");
-  if (path.empty()) usage_error("budget requires --config");
-  if (max_memory.empty()) usage_error("budget requires --max-memory-gb");
-
-  kvbench::Config config = kvbench::load_config_file(path);
-  config.system.gpu_memory_gb = std::stod(max_memory);
-  kvbench::validate_config(config, "budget override");
-  const kvbench::Estimate estimate = kvbench::estimate(config);
-  std::cout << "budget: " << max_memory << " GiB total, "
-            << kvbench::bytes_to_gb(estimate.usable_memory_bytes) << " GiB usable after reserved memory\n";
-  std::cout << "peak working memory: " << kvbench::bytes_to_gb(estimate.peak_working_bytes) << " GiB\n";
-  if (!estimate.fits_usable_memory) {
-    std::cout << "failure: workload exceeds usable memory by "
-              << kvbench::bytes_to_gb(-estimate.headroom_bytes) << " GiB\n";
-    return 1;
-  }
-  std::cout << "ok: workload fits with " << kvbench::bytes_to_gb(estimate.headroom_bytes) << " GiB headroom\n";
-  return 0;
-}
-
-int run_sweep(const Args& args) {
-  const std::string path = args.get("--config");
-  if (path.empty()) usage_error("sweep requires --config");
-  const std::string min_text = args.get("--batch-min");
-  const std::string max_text = args.get("--batch-max");
-  if (min_text.empty() || max_text.empty()) usage_error("sweep requires --batch-min and --batch-max");
-  const int batch_min = std::stoi(min_text);
-  const int batch_max = std::stoi(max_text);
-  if (batch_min <= 0 || batch_max < batch_min) usage_error("invalid batch sweep bounds");
-  const std::string format = args.get("--format", "table");
-  const auto rows = kvbench::sweep_batches(kvbench::load_config_file(path), batch_min, batch_max);
-  if (format == "table") std::cout << kvbench::format_sweep_table(rows);
-  else if (format == "csv") std::cout << kvbench::format_sweep_csv(rows);
-  else usage_error("unsupported sweep format: " + format);
-  return 0;
-}
-
-int run_graph(const Args& args) {
-  const std::string path = args.get("--config");
-  if (path.empty()) usage_error("graph requires --config");
-  const std::string format = args.get("--format", "mermaid");
-  if (format != "mermaid") usage_error("graph currently supports --format mermaid");
-  std::cout << kvbench::format_mermaid_graph(kvbench::estimate(kvbench::load_config_file(path)));
-  return 0;
-}
-
-}  // namespace
-
 int main(int argc, char** argv) {
-  CLI::App app{"Prototype kvbench CLI; v2 planner command migration follows core phases"};
+  CLI::App app{"LLM inference capacity planner: model output, not a hardware benchmark"};
   app.require_subcommand(1);
-  std::string path;
-  std::string format;
+  app.footer("Examples:\n  kvbench budget --config model.json --format json\n  kvbench schedule --config arrivals.json --events events.jsonl\n  kvbench sweep --config model.json --concurrency-min 1 --concurrency-max 4 --context-min 2048 --context-max 4096 --format csv");
+  std::string path, format = "text", events_path, shell = "bash";
   std::vector<std::string> paths;
-  double budget_memory = 0;
-  int batch_min = 1;
-  int batch_max = 1;
-  auto* simulate = app.add_subcommand("simulate", "Static prototype estimate");
-  simulate->add_option("--config", path)->required();
-  simulate->add_option("--format", format)->check(CLI::IsMember({"text", "json", "markdown"}));
-  auto* compare = app.add_subcommand("compare", "Compare prototype configs");
-  compare->add_option("configs", paths)->required();
-  auto* budget = app.add_subcommand("budget", "Check prototype memory fit");
-  budget->add_option("--config", path)->required();
-  budget->add_option("--max-memory-gb", budget_memory)->required();
-  auto* sweep = app.add_subcommand("sweep", "Prototype coupled batch/concurrency sweep");
-  sweep->add_option("--config", path)->required();
-  sweep->add_option("--batch-min", batch_min)->required();
-  sweep->add_option("--batch-max", batch_max)->required();
-  sweep->add_option("--format", format)->check(CLI::IsMember({"table", "csv"}));
-  auto* graph = app.add_subcommand("graph", "Prototype memory graph");
-  graph->add_option("--config", path)->required();
-  graph->add_option("--format", format)->check(CLI::IsMember({"mermaid"}));
-  auto* version = app.add_subcommand("version", "Print version");
-  auto* help = app.add_subcommand("help", "Print help");
+  std::optional<double> memory_gib;
+  std::optional<kvbench::Bytes> memory_bytes;
+  std::optional<kvbench::Count> max_concurrency, batch_tokens;
+  kvbench::Count concurrency_min=1, concurrency_max=1, context_min=1, context_max=1, max_points=1000000;
+  bool fail_oom=false, fail_preemption=false, fail_truncation=false;
+  auto* budget = app.add_subcommand("budget", "Memory breakdown; exit 0 fit / 1 no fit / 2 error");
+  auto* simulate = app.add_subcommand("simulate", "Static worst-case phase-paged memory");
+  auto* scheduling = app.add_subcommand("schedule", "Continuous batching under a modeled time budget");
+  auto* sweep = app.add_subcommand("sweep", "Independent concurrency and context ranges");
+  auto* graph = app.add_subcommand("graph", "Escaped Mermaid memory-budget graph");
+  for (auto* command : {budget,simulate,scheduling,sweep,graph}) command->add_option("--config",path)->required();
+  for (auto* command : {budget,simulate,scheduling,sweep}) command->add_option("--format",format)->check(CLI::IsMember({"text","json","markdown","csv"}));
+  for (auto* command : {budget,simulate}) command->add_option("--max-concurrency",max_concurrency)->check(unsigned_integer());
+  budget->add_option("--max-memory-gib",memory_gib);
+  budget->add_option("--max-memory-bytes",memory_bytes)->check(unsigned_integer());
+  simulate->add_flag("--fail-on-oom",fail_oom);
+  scheduling->add_flag("--fail-on-preemption",fail_preemption);
+  scheduling->add_flag("--fail-on-truncation",fail_truncation);
+  scheduling->add_option("--events",events_path,"Stream event JSONL to this file");
+  scheduling->add_option("--batch-tokens",batch_tokens)->check(unsigned_integer());
+  sweep->add_option("--concurrency-min",concurrency_min)->required()->check(unsigned_integer());
+  sweep->add_option("--concurrency-max",concurrency_max)->required()->check(unsigned_integer());
+  sweep->add_option("--context-min",context_min)->required()->check(unsigned_integer());
+  sweep->add_option("--context-max",context_max)->required()->check(unsigned_integer());
+  sweep->add_option("--batch-tokens",batch_tokens)->check(unsigned_integer());
+  sweep->add_option("--max-points",max_points,"Explicit resource limit for grid output")->check(unsigned_integer());
+  auto* compare = app.add_subcommand("compare","Compare multiple config budgets");
+  compare->add_option("configs",paths)->required();
+  compare->add_option("--format",format)->check(CLI::IsMember({"text","json","markdown","csv"}));
+  auto* completion = app.add_subcommand("completion","Print Bash completion definition");
+  completion->add_option("--shell",shell)->check(CLI::IsMember({"bash"}));
+  auto* version = app.add_subcommand("version","Print package version");
   try {
-    app.parse(argc, argv);
-    Args args;
-    if (*version) { std::cout << "kvbench " << kVersion << "\n"; return 0; }
-    if (*help) { std::cout << app.help(); return 0; }
-    if (*compare) { args.values = {"compare"}; args.values.insert(args.values.end(), paths.begin(), paths.end()); return run_compare(args); }
-    args.values = {"command", "--config", path};
-    if (!format.empty()) args.values.insert(args.values.end(), {"--format", format});
-    if (*simulate) return run_simulate(args);
-    if (*graph) return run_graph(args);
-    if (*budget) {
-      if (!std::isfinite(budget_memory) || budget_memory <= 0) throw std::invalid_argument("budget must be finite and positive");
-      std::ostringstream exact_budget;
-      exact_budget << std::setprecision(std::numeric_limits<double>::max_digits10) << budget_memory;
-      args.values.insert(args.values.end(), {"--max-memory-gb", exact_budget.str()});
-      return run_budget(args);
+    app.parse(argc,argv);
+    if (*version) { std::cout << "kvbench " << kvbench::version << '\n'; return 0; }
+    if (*completion) { std::cout << "_kvbench_complete() { COMPREPLY=( $(compgen -W 'budget simulate schedule sweep compare graph version completion --help --config --format --max-memory-gib --max-memory-bytes --max-concurrency --events --batch-tokens --fail-on-oom --fail-on-preemption --fail-on-truncation --concurrency-min --concurrency-max --context-min --context-max --max-points' -- \"${COMP_WORDS[COMP_CWORD]}\") ); }\ncomplete -F _kvbench_complete kvbench\n"; return 0; }
+    if (*compare) {
+      kvbench::Json j={{"kvbench_result",2},{"command","compare"},{"measurement",false},{"configs",kvbench::Json::array()}};
+      for (const auto& file : paths) { const auto c=load(file); j["configs"].push_back(kvbench::budget_report(c,kvbench::estimate_budget(c),"budget")); }
+      std::cout << kvbench::render_report(j,format); return 0;
+    }
+    auto c=load(path);
+    if (batch_tokens) c.engine.max_num_batched_tokens=*batch_tokens;
+    if (memory_gib && memory_bytes) throw std::invalid_argument("choose one memory override");
+    if (memory_gib) { if (!std::isfinite(*memory_gib) || *memory_gib<=0) throw std::invalid_argument("memory override must be finite and positive"); c.total_gpu_bytes=kvbench::gib_to_bytes(*memory_gib); }
+    if (memory_bytes) c.total_gpu_bytes=*memory_bytes;
+    kvbench::validate_planner_config(c);
+    const auto b=kvbench::estimate_budget(c,max_concurrency);
+    if (*graph) { std::cout << kvbench::budget_graph(c,b); return 0; }
+    if (*budget || *simulate) {
+      std::cout << kvbench::render_report(kvbench::budget_report(c,b,*budget ? "budget" : "simulate"),format);
+      return !b.workload.fits && (*budget || fail_oom) ? 1 : 0;
+    }
+    if (*scheduling) {
+      std::ofstream events;
+      if (!events_path.empty()) {
+        if (std::filesystem::exists(events_path) || std::filesystem::is_symlink(std::filesystem::symlink_status(events_path))) throw std::runtime_error("events path already exists; choose a fresh output path");
+        events.open(events_path,std::ios::binary|std::ios::trunc);
+        if (!events) throw std::runtime_error("cannot open events output");
+      }
+      const auto sink = [&](const kvbench::ScheduleStep& s) {
+        if (events.is_open()) { events << kvbench::event_report(s).dump() << '\n'; if (!events) throw std::runtime_error("cannot write events output"); }
+      };
+      const auto r=kvbench::schedule(c,sink);
+      if (events.is_open()) { events.flush(); if (!events) throw std::runtime_error("cannot flush events output"); }
+      std::cout << kvbench::render_report(kvbench::schedule_report(c,b,r),format);
+      return r.status==kvbench::CompletionStatus::infeasible || (fail_preemption && r.preemptions!=0) || (fail_truncation && r.status!=kvbench::CompletionStatus::completed) ? 1 : 0;
     }
     if (*sweep) {
-      args.values.insert(args.values.end(), {"--batch-min", std::to_string(batch_min), "--batch-max", std::to_string(batch_max)});
-      return run_sweep(args);
+      if (concurrency_min==0 || context_min==0 || concurrency_max<concurrency_min || context_max<context_min || max_points==0) throw std::invalid_argument("invalid sweep bounds");
+      const auto points=kvbench::checked_mul(kvbench::checked_add(concurrency_max-concurrency_min,1),kvbench::checked_add(context_max-context_min,1));
+      if (points>max_points) throw std::invalid_argument("sweep exceeds --max-points");
+      kvbench::Json j={{"kvbench_result",2},{"command","sweep"},{"measurement",false},{"time_model_calibrated",c.engine.calibrated},{"rows",kvbench::Json::array()}};
+      for (auto context=context_min;; context=kvbench::checked_add(context,1)) {
+        for (auto concurrency=concurrency_min;; concurrency=kvbench::checked_add(concurrency,1)) {
+          c.workload.context_tokens=context; c.workload.concurrent_requests=concurrency;
+          const auto row=kvbench::estimate_budget(c);
+          j["rows"].push_back({{"context_tokens",context},{"concurrent_requests",concurrency},{"peak_bytes",row.workload.peak_bytes},{"fits",row.workload.fits},{"risk",row.workload.risk},{"max_num_batched_tokens",c.engine.max_num_batched_tokens}});
+          if (concurrency==concurrency_max) break;
+        }
+        if (context==context_max) break;
+      }
+      if (format=="csv") {
+        std::cout << "context_tokens,concurrent_requests,peak_bytes,fits,risk,max_num_batched_tokens\n";
+        for (const auto& row : j["rows"]) std::cout << row.at("context_tokens") << ',' << row.at("concurrent_requests") << ',' << row.at("peak_bytes") << ',' << row.at("fits") << ',' << row.at("risk").get<std::string>() << ',' << row.at("max_num_batched_tokens") << '\n';
+      } else std::cout << kvbench::render_report(j,format);
+      return 0;
     }
-  } catch (const CLI::CallForHelp&) {
-    std::cout << app.help(); return 0;
-  } catch (const CLI::ParseError&) {
-    std::cerr << "error: invalid command or option; see --help\n"; return 2;
-  } catch (const std::exception& error) {
-    std::string message = error.what();
-    const auto end = message.find_first_of("\r\n");
-    std::cerr << "error: " << message.substr(0, end) << "\n"; return 2;
+  } catch (const CLI::CallForHelp&) { std::cout << app.help(); return 0; }
+  catch (const CLI::ParseError&) { std::cerr << "error: invalid command or option; see --help\n"; return 2; }
+  catch (const std::exception& error) {
+    const std::string message=error.what(); std::cerr << "error: " << message.substr(0,message.find_first_of("\r\n")) << '\n'; return 2;
   }
   return 2;
 }

@@ -2,8 +2,7 @@
 
 `parse_planner_config` accepts `schema_version: 2` and returns a validated
 `PlannerConfig` plus warnings. Schema-less input is v1; see [migration](migration.md).
-Prototype CLI commands still use their compatibility API until the static/CLI
-migration phases. They reject v2 instead of silently ignoring its budget fields.
+All CLI planning commands use this schema and the same validated memory model.
 
 Only listed fields are accepted in v2. Sections must be objects, booleans must
 be JSON booleans, counts must be JSON integers (even `8.0` is rejected), and
@@ -43,8 +42,7 @@ All values below are planning defaults, not calibration evidence.
 | num_shared_experts | 0 | 0–65536 |
 | quantization_overhead_bytes | 0 bytes | Explicit uint64 checkpoint metadata allowance |
 
-The [weight estimator](static-model.md) uses these fields. The prototype CLI
-is transitional and does not silently apply schema-v2 fields.
+The [weight estimator](static-model.md) uses these fields; explicit weights are preferred.
 
 ## Hardware and engine
 

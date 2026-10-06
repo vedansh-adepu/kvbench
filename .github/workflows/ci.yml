@@ -25,4 +25,4 @@ jobs:
         run: |
           ./build/kvbench version
           ./build/kvbench simulate --config examples/workloads/llama7b_chat.json --format json
-          ./build/kvbench budget --config examples/workloads/llama7b_chat.json --max-memory-gb 80
+          ./build/kvbench budget --config examples/workloads/llama7b_chat.json --max-memory-gib 80
