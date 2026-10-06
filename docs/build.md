@@ -1,6 +1,8 @@
 # Building
 
-CMake 3.20+, a C++20 compiler and Ninja are required by the presets.
+CMake 3.20+, a C++20 compiler and Ninja are required by the presets. Python 3
+is needed for CLI/docs tests. On Windows, use a Visual Studio Developer shell
+with MSVC in PATH; CI configures that environment explicitly.
 Illustrative online build: `cmake --preset dev`, `cmake --build --preset dev`,
 `ctest --preset dev`. Project warnings can be treated as errors; dependencies
 are not given project warning flags. The package version comes from CMake and

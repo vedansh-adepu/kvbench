@@ -15,3 +15,7 @@ coverage/
 *.profraw
 *.profdata
 fuzz-artifacts/
+*.sarif
+.env
+.env.*
+release-artifacts/

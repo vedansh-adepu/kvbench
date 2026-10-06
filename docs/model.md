@@ -3,7 +3,7 @@
 The checked shared memory API is `include/kvbench/memory.hpp`, implemented in
 `src/memory.cpp`. The CLI uses this shared API. All memory results are whole bytes (`uint64_t`), never floating GiB.
 Presentation conversions use GiB = 2^30 bytes; decimal GB = 10^9 bytes.
-The [prototype model](history/prototype-model.md) describes the old CLI only.
+Prototype formulas remain in Git history at ce2f280; they are not a supported contract.
 
 ## Arithmetic and storage
 

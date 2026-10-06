@@ -29,8 +29,9 @@ Queueing delay is first admission minus arrival; end-to-end latency is completio
 minus arrival. Percentiles use nearest rank on the available samples.
 Zero-output requests complete after prefill and have no TTFT sample.
 
-Peak blocks include final-token allocations before completed requests release
-them. Saturation time is the first step start at which all pool blocks are held.
+Peak blocks measure logical pool occupancy, not GPU-resident VRAM: engines may
+preallocate the whole pool at startup. They include final-token allocations before
+completed requests release them. Saturation time is the first step start at which all pool blocks are held.
 Throughput is committed generated tokens divided by elapsed modeled time from
 zero, including idle arrival gaps; it is not measured GPU throughput.
 
