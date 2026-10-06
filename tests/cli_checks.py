@@ -67,4 +67,17 @@ with tempfile.TemporaryDirectory(prefix="kvbench-cli-") as directory:
     source["engine"]["max_steps"] = 1
     config.write_text(json.dumps(source), encoding="utf-8")
     assert invoke("schedule", "--config", config, "--fail-on-truncation").returncode == 1
+    hf = root / "hf.json"
+    hf.write_text(json.dumps({"num_hidden_layers": 32, "num_attention_heads": 32, "num_key_value_heads": 8, "hidden_size": 4096, "intermediate_size": 14336, "vocab_size": 128256}), encoding="utf-8")
+    imported = json.loads(invoke("import-hf", hf, "--format", "json").stdout)
+    assert imported["config"]["model"]["num_kv_heads"] == 8
+    log = root / "startup.log"
+    log.write_text("# GPU blocks: 3\n", encoding="utf-8")
+    source["engine"]["max_steps"] = 100
+    config.write_text(json.dumps(source), encoding="utf-8")
+    compared = invoke("calibrate", "--config", config, "--vllm-log", log, "--tolerance", "0", "--format", "json")
+    assert compared.returncode == 0 and json.loads(compared.stdout)["within_tolerance"]
+    log.write_text("# GPU blocks: 1\n", encoding="utf-8")
+    assert invoke("calibrate", "--config", config, "--vllm-log", log, "--tolerance", "0").returncode == 1
+    assert invoke("calibrate", "--config", config, "--vllm-log", log, "--tolerance", "nan").returncode == 2
     print("CLI numeric, schema, scheduler, output, sweep and safety regressions passed")

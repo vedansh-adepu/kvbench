@@ -13,6 +13,8 @@ or GPU operations. Schema-v1 configs remain readable with deprecation warnings.
 | sweep | --config; required --concurrency-min/max and --context-min/max; --batch-tokens; --max-points; --format | 0 completed grid; 2 invalid/error |
 | compare | one or more config paths; --format | 0 valid comparison, 2 error |
 | graph | --config | Mermaid output, 0 valid or 2 error |
+| import-hf | HF config.json positional input; --format | 0 imported; 2 unsupported/invalid |
+| calibrate | --config; --vllm-log; --tolerance (default 5%); --format | 0 within tolerance; 1 outside; 2 invalid/missing capacity |
 | version | no arguments | CMake-generated version, exit 0 |
 | completion | --shell bash | Bash completion definition, exit 0 |
 
@@ -53,5 +55,5 @@ max_num_batched_tokens columns. Mermaid labels encode delimiters and controls.
 arrival sensitivity, exit codes, output safety and independent grid dimensions.
 
 Illustrative Bash completion setup: `source <(kvbench completion --shell bash)`.
-Import-HF and calibration commands are added in P7; they are not advertised as
-implemented here.
+See [calibration](calibration.md) for supported log patterns and the limits of
+HF architecture import. No real-engine calibration evidence has been collected.

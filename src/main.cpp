@@ -6,6 +6,7 @@
 #include <optional>
 #include <stdexcept>
 #include "kvbench/output.hpp"
+#include "kvbench/integration.hpp"
 #include "kvbench/version.hpp"
 
 namespace {
@@ -26,6 +27,8 @@ int main(int argc, char** argv) {
   app.footer("Examples:\n  kvbench budget --config model.json --format json\n  kvbench schedule --config arrivals.json --events events.jsonl\n  kvbench sweep --config model.json --concurrency-min 1 --concurrency-max 4 --context-min 2048 --context-max 4096 --format csv");
   std::string path, format = "text", events_path, shell = "bash";
   std::vector<std::string> paths;
+  std::string hf_path, log_path;
+  double tolerance = 5;
   std::optional<double> memory_gib;
   std::optional<kvbench::Bytes> memory_bytes;
   std::optional<kvbench::Count> max_concurrency, batch_tokens;
@@ -52,6 +55,14 @@ int main(int argc, char** argv) {
   sweep->add_option("--context-max",context_max)->required()->check(unsigned_integer());
   sweep->add_option("--batch-tokens",batch_tokens)->check(unsigned_integer());
   sweep->add_option("--max-points",max_points,"Explicit resource limit for grid output")->check(unsigned_integer());
+  auto* import = app.add_subcommand("import-hf","Import architecture and report unmapped HF fields");
+  import->add_option("config.json",hf_path)->required();
+  import->add_option("--format",format)->check(CLI::IsMember({"text","json","markdown","csv"}));
+  auto* calibrate = app.add_subcommand("calibrate","Compare predicted memory with a supplied startup log");
+  calibrate->add_option("--config",path)->required();
+  calibrate->add_option("--vllm-log",log_path)->required();
+  calibrate->add_option("--tolerance",tolerance);
+  calibrate->add_option("--format",format)->check(CLI::IsMember({"text","json","markdown","csv"}));
   auto* compare = app.add_subcommand("compare","Compare multiple config budgets");
   compare->add_option("configs",paths)->required();
   compare->add_option("--format",format)->check(CLI::IsMember({"text","json","markdown","csv"}));
@@ -61,7 +72,14 @@ int main(int argc, char** argv) {
   try {
     app.parse(argc,argv);
     if (*version) { std::cout << "kvbench " << kvbench::version << '\n'; return 0; }
-    if (*completion) { std::cout << "_kvbench_complete() { COMPREPLY=( $(compgen -W 'budget simulate schedule sweep compare graph version completion --help --config --format --max-memory-gib --max-memory-bytes --max-concurrency --events --batch-tokens --fail-on-oom --fail-on-preemption --fail-on-truncation --concurrency-min --concurrency-max --context-min --context-max --max-points' -- \"${COMP_WORDS[COMP_CWORD]}\") ); }\ncomplete -F _kvbench_complete kvbench\n"; return 0; }
+    if (*completion) { std::cout << "_kvbench_complete() { COMPREPLY=( $(compgen -W 'budget simulate schedule sweep compare graph import-hf calibrate version completion --help --config --format --max-memory-gib --max-memory-bytes --max-concurrency --events --batch-tokens --fail-on-oom --fail-on-preemption --fail-on-truncation --concurrency-min --concurrency-max --context-min --context-max --max-points' -- \"${COMP_WORDS[COMP_CWORD]}\") ); }\ncomplete -F _kvbench_complete kvbench\n"; return 0; }
+    if (*import) { std::cout << kvbench::render_report(kvbench::import_hf(kvbench::read_text_input(hf_path)),format); return 0; }
+    if (*calibrate) {
+      const auto c=load(path);
+      const auto report=kvbench::compare_calibration(c,kvbench::parse_vllm_log(kvbench::read_text_input(log_path)),tolerance);
+      std::cout << kvbench::render_report(report,format);
+      return report.at("within_tolerance").get<bool>() ? 0 : 1;
+    }
     if (*compare) {
       kvbench::Json j={{"kvbench_result",2},{"command","compare"},{"measurement",false},{"configs",kvbench::Json::array()}};
       for (const auto& file : paths) { const auto c=load(file); j["configs"].push_back(kvbench::budget_report(c,kvbench::estimate_budget(c),"budget")); }

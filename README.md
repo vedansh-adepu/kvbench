@@ -38,7 +38,7 @@ See [configuration](docs/config-reference.md) and [migration](docs/migration.md)
 - Decode-first continuous batching, chunked prefill, recompute preemption and arrivals.
 
 Use `budget`, `simulate`, `schedule`, `sweep`, `compare`, `graph`, `version` and
-`completion`; see [CLI](docs/cli.md). JSON results carry `kvbench_result: 2`.
+`completion`, `import-hf` and `calibrate`; see [CLI](docs/cli.md). JSON results carry `kvbench_result: 2`.
 Memory fields use bytes, with GiB inputs named explicitly. Events stream to
 JSONL only when requested and are never retained as a history by the scheduler.
 
@@ -56,7 +56,7 @@ worst-case output; neither is presented as measured throughput.
 - MLA weights require explicit checkpoint size; cache dimensions do not determine weights.
 - No prefix sharing, speculative decoding, distributed serving or kernel execution.
 - Remote CI, coverage and sanitizer/fuzz/static-analysis gates are not yet verified.
-- The import/calibration commands, generated results and benchmarks are upcoming phases.
+- Generated results and performance benchmarks are upcoming phases.
 
 ## License
 
