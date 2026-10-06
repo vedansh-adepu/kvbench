@@ -32,7 +32,7 @@
 
 - D1: explicit/estimated resident weights; GQA shapes, gated MLP, tied heads, MoE.
 - D2: separate explicit UNCALIBRATED runtime/activation/graph allowances.
-- D3: measured pressure constants removed; modeled step-time coefficients are explicit.
+- D3: uncalibrated pressure constants removed; modeled step-time coefficients are explicit.
 - D4: documented CMake minimum matches preset/CTest commands.
 - D5: independent sweep dimensions and separate batched-token override.
 - D6: arrivals are admitted at modeled step boundaries; no hidden 10 ms tick.

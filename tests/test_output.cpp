@@ -14,3 +14,14 @@ TEST_CASE("Output labels cannot inject Markdown or Mermaid statements", "[output
           .at("count")
           .get<kvbench::Count>() == 18446744073709551615ULL);
 }
+
+TEST_CASE("Human capacity output labels explicitly bounded lower limits", "[output]") {
+  kvbench::Json report = {
+      {"static_worst_case", {{"max_concurrency", 10}, {"max_concurrency_is_lower_bound", true}}}};
+  REQUIRE(kvbench::render_report(report, "text").find("at least 10") != std::string::npos);
+  REQUIRE(kvbench::parse_json(kvbench::render_report(report, "json"))
+              .at("static_worst_case")
+              .at("max_concurrency") == 10);
+  report["static_worst_case"]["max_concurrency_is_lower_bound"] = false;
+  REQUIRE(kvbench::render_report(report, "text").find("at least") == std::string::npos);
+}

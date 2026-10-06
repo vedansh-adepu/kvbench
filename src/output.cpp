@@ -150,7 +150,10 @@ std::string render_report(const Json& report, const std::string& format) {
     out << "Model output, not a hardware measurement; time model uncalibrated unless stated.\n";
   else
     throw std::invalid_argument("unsupported output format");
-  for (const auto& [key, value] : rows) {
+  for (auto& [key, value] : rows) {
+    if (key == "static_worst_case.max_concurrency" &&
+        report.at("static_worst_case").value("max_concurrency_is_lower_bound", false))
+      value.insert(0, "at least ");
     if (format == "markdown")
       out << "| " << markdown(key) << " | " << markdown(value) << " |\n";
     else if (format == "csv")

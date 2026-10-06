@@ -10,7 +10,7 @@ from pathlib import Path
 binary = sys.argv[1]
 
 def invoke(*args):
-    return subprocess.run([binary, *map(str, args)], capture_output=True, text=True, check=False)
+    return subprocess.run([binary, *map(str, args)], capture_output=True, text=True, check=False, timeout=10)
 
 with tempfile.TemporaryDirectory(prefix="kvbench-cli-") as directory:
     root = Path(directory)
@@ -55,6 +55,11 @@ with tempfile.TemporaryDirectory(prefix="kvbench-cli-") as directory:
     assert all(row["max_num_batched_tokens"] == 3 for row in grid)
     assert invoke("sweep", "--config", config, "--concurrency-min", "0", "--concurrency-max", "2", "--context-min", "1", "--context-max", "2").returncode == 2
     assert invoke("sweep", "--config", config, "--concurrency-min", "1", "--concurrency-max", "2", "--context-min", "1", "--context-max", "2", "--max-points", "1").returncode == 2
+    # Inclusive single-point ranges at signed-int boundaries must terminate.
+    edge = invoke("sweep", "--config", config, "--concurrency-min", "2147483647", "--concurrency-max", "2147483647", "--context-min", "1", "--context-max", "1", "--format", "json")
+    assert edge.returncode == 0 and len(json.loads(edge.stdout)["rows"]) == 1
+    overflow = invoke("sweep", "--config", config, "--concurrency-min", "18446744073709551615", "--concurrency-max", "18446744073709551615", "--context-min", "1", "--context-max", "1", "--format", "json")
+    assert overflow.returncode == 2 and "overflow" in overflow.stderr
     md = invoke("budget", "--config", config, "--format", "markdown").stdout
     assert 'a\\|b<br>"quoted"' in md
     rows = list(csv.reader(io.StringIO(invoke("budget", "--config", config, "--format", "csv").stdout)))

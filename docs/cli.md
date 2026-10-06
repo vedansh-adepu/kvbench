@@ -23,7 +23,7 @@ default is text. Graph emits Mermaid directly. `--help` exits 0.
 The memory override must be positive/finite and the two unit alternatives cannot
 be combined. Nonnegative integer options reject signs, fractions and overflow.
 `--max-concurrency` must be positive; a genuinely capped capacity sets
-`max_concurrency_is_lower_bound=true` rather than pretending the cap is exact.
+`max_concurrency_is_lower_bound=true`; human formats display "at least N".
 Sweep ranges are independent, inclusive, step one and checked before iteration;
 `--max-points` defaults to 1000000. The batch-token override is independent of
 the concurrency/context grid.

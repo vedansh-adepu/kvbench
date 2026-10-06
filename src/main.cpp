@@ -234,7 +234,13 @@ int run_cli(int argc, char** argv) {
 }  // namespace
 int main(int argc, char** argv) {
   try {
-    return run_cli(argc, argv);
+    const int result = run_cli(argc, argv);
+    std::cout.flush();
+    if (!std::cout) {
+      static_cast<void>(std::fputs("error: failed to write output\n", stderr));
+      return 2;
+    }
+    return result;
   } catch (...) {
     static_cast<void>(std::fputs("error: command setup failed\n", stderr));
     return 2;

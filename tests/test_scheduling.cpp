@@ -1,6 +1,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <limits>
+#include <stdexcept>
 
 #include "kvbench/json.hpp"
 #include "kvbench/scheduling.hpp"
@@ -193,4 +195,13 @@ TEST_CASE("Zero-output requests complete at prefill and retain no fake TTFT", "[
   REQUIRE(r.status == kvbench::CompletionStatus::completed);
   REQUIRE(r.steps == 0);
   REQUIRE(r.tokens_per_second == 0);
+}
+
+TEST_CASE("Tiny finite step times cannot emit infinite modeled throughput", "[schedule]") {
+  auto c = fixture();
+  c.workload.requests.resize(1);
+  c.engine.base_step_ms = std::numeric_limits<double>::denorm_min();
+  c.engine.prefill_ms_per_token = 0;
+  c.engine.decode_ms_per_seq = 0;
+  REQUIRE_THROWS_AS(kvbench::schedule(c), std::overflow_error);
 }

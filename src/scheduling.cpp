@@ -69,6 +69,8 @@ ScheduleResult schedule(const PlannerConfig& c, const EventSink& sink) {
     if (result.elapsed_ms > 0)
       result.tokens_per_second =
           static_cast<double>(result.generated_tokens) * 1000 / result.elapsed_ms;
+    if (!std::isfinite(result.tokens_per_second))
+      throw std::overflow_error("modeled throughput exceeds finite numeric range");
     return result;
   };
   if (inputs.empty()) return finish();

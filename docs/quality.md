@@ -64,3 +64,25 @@ crashes or sanitizer failures. Seed 1729, max_len=16384 and per-input timeout=3.
 These are bounded local results, not exhaustive coverage or a remote CI pass.
 ASan still hangs at runtime startup even for a trivial program; it is unverified.
 C++ mutation testing was not run; no score is claimed.
+
+## Local P11 results
+
+Final development, Release, coverage and separate non-recovering UBSan runs each
+passed all 58 CTest cases. Catch2 reports 1203 assertions in 51 test cases; the
+remaining CTest checks exercise the CLI, examples, documentation, packaging and
+workflow policy. The golden subset passed 48 assertions in five cases.
+
+Final src line coverage: 1389/1454 = 95.53%; reported branch
+coverage 53.2% (not a gate). The source copy includes every src file,
+and generated GCDA counters were cleared before the full measurement. Selected
+clang-tidy and exhaustive cppcheck passed with no project findings; clang-format
+checks passed. Fresh bounded fuzz runs completed 110,954 config inputs and 3,043
+log inputs in 11 seconds each, with no crashes or UBSan failures; flags and
+runtime are the same as P8. CPU benchmark results were rerun in Release and
+are recorded in [performance](performance.md).
+
+The combined ASan/UBSan build completed after deferring Catch2 discovery to
+test time (`-DCMAKE_CATCH_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST`). Test discovery
+still hung at local ASan runtime startup; the bounded 10-second attempt was
+stopped. ASan execution remains UNVERIFIED. Remote compiler/scanner/sanitizer
+jobs and real-engine calibration remain pending. Mutation testing was skipped.

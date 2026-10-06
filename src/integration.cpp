@@ -220,6 +220,8 @@ Json compare_calibration(const PlannerConfig& c, const LogObservations& observed
   if (observed.utilization) {
     const double error = std::abs(c.engine.gpu_memory_utilization - *observed.utilization);
     const double percent = error * 100 / *observed.utilization;
+    if (!std::isfinite(percent))
+      throw std::overflow_error("utilization percent error exceeds finite numeric range");
     report["terms"].push_back({{"term", "gpu_memory_utilization"},
                                {"predicted", c.engine.gpu_memory_utilization},
                                {"observed", *observed.utilization},

@@ -23,6 +23,6 @@ verify the pinned hashes yourself before extracting them. Builds may override
 preset output with `-B /path/outside/repository`.
 
 `asan-ubsan` enables ASan and non-recovering UBSan. `coverage` enables compiler
-coverage instrumentation. `fuzz` reserves the Clang/libFuzzer configuration;
+coverage instrumentation. `fuzz` selects the Clang/libFuzzer configuration;
 it builds the bounded config/log targets documented in [quality](quality.md).
 Presets are not evidence of successful CI or numerical correctness.

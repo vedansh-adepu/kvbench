@@ -105,6 +105,8 @@ TEST_CASE("Calibration compares synthetic terms and preserves missing observatio
       kvbench::compare_calibration(c, observed, std::numeric_limits<double>::quiet_NaN()));
   observed.utilization = 0;
   REQUIRE_THROWS(kvbench::compare_calibration(c, observed, 5));
+  observed.utilization = std::numeric_limits<double>::denorm_min();
+  REQUIRE_THROWS_AS(kvbench::compare_calibration(c, observed, 5), std::overflow_error);
   observed.utilization.reset();
   observed.terms = {{"weights_bytes", 0}};
   REQUIRE_THROWS(kvbench::compare_calibration(c, observed, 5));

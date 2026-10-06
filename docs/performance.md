@@ -15,8 +15,8 @@ Measured time includes process startup, JSON IO and formatting; stdout is discar
 
 | Workload | Median wall time (ms) | Peak child RSS (MiB) | Runs |
 | --- | ---: | ---: | ---: |
-| 10,000-point independent sweep | 40.87 | 7.83 | 3 |
-| 10,000-request schedule | 208.27 | 22.61 | 3 |
+| 10,000-point independent sweep | 27.31 | 7.81 | 3 |
+| 10,000-request schedule | 205.06 | 22.55 | 3 |
 
 RSS is the maximum observed child-process RSS from the system time utility;
 no cross-machine performance or GPU provisioning accuracy is implied.
