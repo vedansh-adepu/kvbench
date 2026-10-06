@@ -1,85 +1,85 @@
-# Estimation Model
+# Cache memory model
 
-kvbench is a capacity simulator. It does not execute an LLM and it does not claim exact hardware throughput.
+The checked shared memory API is `include/kvbench/memory.hpp`, implemented in
+`src/memory.cpp`. P1 establishes this API; the prototype CLI is not yet migrated
+to it. All memory results are whole bytes (`uint64_t`), never floating GiB.
+Presentation conversions use GiB = 2^30 bytes; decimal GB = 10^9 bytes.
+The [prototype model](history/prototype-model.md) describes the old CLI only.
 
-The simulator estimates memory pressure from model shape, active tokens, request concurrency, KV quantization, page size, and reserved device memory.
+## Arithmetic and storage
 
-## Dtypes
+Addition, multiplication and subtraction throw on overflow/underflow. Ceiling
+division is `a / b + (a % b != 0)`, avoiding the overflow in `a+b-1`.
+GiB input converts to bytes by rounding down. Negative/non-finite values and
+values at or above 2^64 bytes are rejected before integer conversion.
 
-Explicit byte sizes are used:
+For standard attention, each layer stores two planes, K and V. Elements per
+plane per token = `num_kv_heads * head_dim`; query heads do not multiply KV.
+For MLA, there is one plane: `kv_lora_rank + qk_rope_head_dim` elements per
+layer and token. This is latent caching; a backend expanding K/V uses more.
+[The vLLM v0.10.1 implementation](https://github.com/vllm-project/vllm/blob/v0.10.1/vllm/v1/kv_cache_interface.py)
+also distinguishes one MLA latent from two standard attention planes.
 
-| dtype | bytes |
-|---|---:|
-| fp32 | 4 |
-| fp16 | 2 |
-| bf16 | 2 |
-| int8 | 1 |
-| int4 | 0.5 |
+Storage bits per element: fp32=32, fp16/bf16=16,
+fp8_e4m3/fp8_e5m2/int8=8, int4=4. Each layer/plane is packed separately.
+At a block of P tokens, bytes per plane = `ceil(P * plane_elements * bits / 8)`.
+For int4 this is computed as `ceil(elements/2)`, without multiplying into an
+unrepresentable intermediate bit count. An odd final nibble pads to one byte.
+`data_bytes_per_token` describes separately packed single-token planes, so it
+need not multiply exactly into block bytes when a plane has odd int4 elements.
 
-## KV-cache bytes
+## Metadata
 
-Per-token KV bytes:
+No metadata is included in `none` scale mode. For quantized storage, scale
+bytes default to 4, zero-point bytes to 0 and group size to 64; select the actual
+backend layout explicitly. These defaults are planning assumptions, not an
+engine support or accuracy claim.
 
-```text
-layers * kv_heads * head_dim * 2 * kv_dtype_bytes
-```
+- `per_tensor`: one scale/zero-point entry per layer/plane, allocated once for
+  the pool, rather than charged to every token or block.
+- `per_token_head`: one entry per token/head/plane; MLA treats its latent as
+  one head/plane. Metadata per block = P × heads × planes × entry bytes.
+- `group`: one entry per group of N elements in each layer/plane/block,
+  rounded up independently. Groups reset at each block boundary.
 
-The factor of 2 accounts for keys and values.
+`bytes_per_block` sums all layer data and per-block metadata. Pool bundle
+capacity = `floor((pool_bytes - constant_metadata_bytes)/bytes_per_block)`,
+or zero when the pool cannot hold constant metadata. Actual quantization can
+require alignment, zero points or additional metadata: configure and calibrate.
 
-Total KV bytes:
+## Paging, sliding windows and hybrid layers
 
-```text
-per_token_kv_bytes * (context_tokens + decode_tokens) * concurrent_requests
-```
+Full and MLA layers use `ceil(tokens/P)` blocks. Sliding layers use
+`ceil(min(tokens,window)/P) + swa_extra_blocks` for nonzero tokens, defaulting
+to one extra block. Zero tokens allocate no sequence blocks. Each layer can
+have its own type/window; a supplied layer list must match `num_layers`.
+Sequence bytes sum the individual layer block counts and byte widths.
 
-Fragmentation is modeled by rounding each request's active token count up to `page_size_tokens` and charging the extra tokens as KV bytes.
+The extra block is motivated by the window starting inside a block in
+[the vLLM v0.10.1 SlidingWindowSpec](https://github.com/vllm-project/vllm/blob/v0.10.1/vllm/v1/kv_cache_interface.py).
+That implementation also budgets newly scheduled prefill tokens. kvbench's
+window cap plus configurable extra blocks is a planning abstraction, not an
+exact reproduction of that version's chunk-admission formula. Real hybrid
+cache-group padding and sharing are not inferred by this byte model.
 
-## Memory budget
+## Golden derivations
 
-Usable memory:
+These are mathematical expected values, verified by `tests/test_memory.cpp`,
+not hardware measurements:
 
-```text
-gpu_memory_gb - reserved_memory_gb
-```
+| Geometry, bf16 | Derivation | Bytes/token |
+| --- | --- | ---: |
+| Llama-3-8B-like GQA | 32 × 8 × 128 × 2 planes × 2 bytes | 131,072 |
+| Same MHA | 32 × 32 × 128 × 2 × 2 | 524,288 |
+| Qwen2.5-72B-like GQA | 80 × 8 × 128 × 2 × 2 | 327,680 |
+| DeepSeek-V3-like latent MLA | 61 × (512+64) × 2 bytes | 70,272 |
 
-The simulator compares peak working memory against usable memory. Reserved memory is reported separately and included in total device pressure, but budget pass or fail uses usable memory.
+At P=16, the first geometry requires 2,097,152 bytes/block. A 4 GiB pool
+contains 2,048 blocks or 32,768 tokens, excluding weights/runtime overheads
+(which belong to the budget phase). A 2,049-token sequence needs 129 blocks.
+With int8/fp8 and no metadata, data is half bf16; int4 is one quarter when
+packing dimensions are even. Tests separately verify exact scale overheads.
 
-## Prefill and decode pressure
-
-Prefill pressure includes KV for input context plus a heuristic activation scratch term:
-
-```text
-layers * hidden_size * min(context_tokens, prefill_chunk_size) * active_batch * model_dtype_bytes * 0.25
-```
-
-Decode pressure includes final KV after generated tokens plus a one-step activation scratch term:
-
-```text
-layers * hidden_size * batch_size * model_dtype_bytes * 0.25
-```
-
-These scratch estimates are deliberately conservative planning signals. They are not kernel-level activation traces.
-
-## OOM risk
-
-OOM risk is based on `peak_working_memory / usable_memory`:
-
-| ratio | risk |
-|---:|---|
-| `< 0.60` | low |
-| `0.60-0.75` | moderate |
-| `0.75-0.90` | elevated |
-| `0.90-1.00` | high |
-| `>= 1.00` | exceeded |
-
-## Scheduler simulation
-
-For configs with a `requests` array, kvbench runs a deterministic scheduler:
-
-- requests become active at `arrival_ms`
-- prefill advances by `prefill_chunk_size` tokens per step
-- decode advances by one output token per step
-- active KV tokens are tracked over time
-- peak memory and OOM events are detected against usable memory
-
-The scheduler is intentionally small and deterministic so output is reproducible in CI and local planning.
+Every public memory entry point validates caller-mutated geometry. Dimensions
+must be positive and bounded; invalid enums and layer patterns are errors.
+Non-divisible KV/query head counts produce a warning for caller inspection.
