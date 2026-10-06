@@ -1,0 +1,33 @@
+{
+  "schema_version": 2,
+  "model": {
+    "name": "llama3-8b-like",
+    "num_layers": 32,
+    "num_attention_heads": 32,
+    "num_kv_heads": 8,
+    "head_dim": 128,
+    "hidden_size": 4096
+  },
+  "weights": {
+    "dtype": "bf16",
+    "intermediate_size": 14336,
+    "vocab_size": 128256,
+    "tie_word_embeddings": false
+  },
+  "engine": {
+    "gpu_memory_utilization": 0.9,
+    "non_torch_overhead_gib": 0.25,
+    "activation_peak_gib": 1,
+    "cudagraph_memory_gib": 0.5,
+    "block_size": 16,
+    "kv_dtype": "bf16"
+  },
+  "hardware": {
+    "total_gpu_bytes": 24000000000
+  },
+  "workload": {
+    "context_tokens": 4096,
+    "decode_tokens": 512,
+    "concurrent_requests": 4
+  }
+}

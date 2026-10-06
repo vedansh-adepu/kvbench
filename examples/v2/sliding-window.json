@@ -1,0 +1,36 @@
+{
+  "schema_version": 2,
+  "model": {
+    "name": "hybrid sliding-window toy",
+    "num_layers": 2,
+    "num_attention_heads": 8,
+    "num_kv_heads": 2,
+    "head_dim": 16,
+    "hidden_size": 128,
+    "layer_types": [
+      "full",
+      {
+        "type": "sliding",
+        "window_tokens": 128
+      }
+    ]
+  },
+  "weights": {
+    "dtype": "bf16",
+    "intermediate_size": 512,
+    "vocab_size": 1024
+  },
+  "engine": {
+    "non_torch_overhead_bytes": 16777216,
+    "activation_peak_bytes": 33554432,
+    "cudagraph_memory_bytes": 16777216
+  },
+  "hardware": {
+    "total_gpu_gib": 4
+  },
+  "workload": {
+    "context_tokens": 1024,
+    "decode_tokens": 128,
+    "concurrent_requests": 8
+  }
+}
