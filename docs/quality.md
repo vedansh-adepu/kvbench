@@ -24,8 +24,8 @@ coverage collection; no source files were excluded to make the number pass.
 `asan-ubsan` enables both sanitizers and disables UBSan recovery. The local Apple
 ASan runtime hung even on a trivial executable; this is unverified, not a passing
 sanitizer result. A separate full UBSan run is used to distinguish that runtime
-issue from undefined behavior checks. The combined job is configured for Linux CI,
-which has not run for this branch and must be verified after publication.
+issue from undefined behavior checks. The combined job also runs on Linux CI; its verified remote result is recorded
+below separately from the macOS-local limitation.
 
 ## Fuzzing
 
@@ -107,3 +107,50 @@ The Linux ASan+UBSan job runs the full CTest preset with
 `UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1`, including test discovery/build.
 The observed ASan hang is a macOS-local limitation until Linux evidence says
 otherwise; the Linux job is not skipped or reduced.
+
+## Verified remote results — 2026-10-06
+
+Measured implementation: `3d84eb2`. All eight jobs passed in
+[CI run 37475033670](https://github.com/vedansh-adepu/kvbench/actions/runs/37475033670),
+and [CodeQL run 37475033616](https://github.com/vedansh-adepu/kvbench/actions/runs/37475033616) passed.
+
+| Job | Result | Evidence |
+| --- | --- | --- |
+| Linux GCC | Passed full 58-test suite | [job](https://github.com/vedansh-adepu/kvbench/actions/runs/37475033670/job/112308118660) |
+| Linux Clang | Passed full 58-test suite | [job](https://github.com/vedansh-adepu/kvbench/actions/runs/37475033670/job/112308118179) |
+| macOS AppleClang | Passed full 58-test suite | [job](https://github.com/vedansh-adepu/kvbench/actions/runs/37475033670/job/112308117988) |
+| Windows MSVC | Passed full 58-test suite with /W4 /WX | [job](https://github.com/vedansh-adepu/kvbench/actions/runs/37475033670/job/112308118096) |
+| Linux ASan+UBSan | Passed full 58-test suite; leak detection enabled | [job](https://github.com/vedansh-adepu/kvbench/actions/runs/37475033670/job/112308118181) |
+| Coverage | Passed full suite and 90% src line gate; both branch reports uploaded | [job](https://github.com/vedansh-adepu/kvbench/actions/runs/37475033670/job/112308117965) |
+| clang-tidy/cppcheck | Passed selected checks | [job](https://github.com/vedansh-adepu/kvbench/actions/runs/37475033670/job/112308117736) |
+| Fuzz smoke | Passed both bounded targets | [job](https://github.com/vedansh-adepu/kvbench/actions/runs/37475033670/job/112308117759) |
+| CodeQL C++ | Passed build and analysis | [job](https://github.com/vedansh-adepu/kvbench/actions/runs/37475033616/job/112308115514) |
+
+Compiler/full-suite jobs include generated-results drift, README examples, CLI,
+packaging and workflow checks. Local Catch2 counts remain 51 cases and 1203
+assertions. Linux sanitizer output reports 58/58 CTest cases passed in 3.37 s;
+it did not reproduce the local macOS ASan startup hang. No sanitizer job was
+dropped and no compiler warnings were weakened.
+
+Actual Linux GCC/gcovr src measurements from the uploaded artifacts:
+
+| Metric | Covered / total | Percent | Gate |
+| --- | ---: | ---: | --- |
+| Lines | 1260 / 1320 | 95.45% | 90% |
+| Raw branches | 2629 / 5316 | 49.45% | None |
+| Filtered branches | 1989 / 2359 | 84.31% | None |
+
+The filtered command uses both `--exclude-throw-branches` and
+`--exclude-unreachable-branches`. Raw figures are retained; differences from
+AppleClang reflect compiler instrumentation/classification, not source exclusion.
+No branch gate was added. Linux fuzz smoke completed 59,855 config inputs and
+75 log inputs in 11 seconds each, without crashes; these bounded counts are
+host/run dependent and do not measure coverage or prove exhaustive safety.
+
+The initial [CI](https://github.com/vedansh-adepu/kvbench/actions/runs/37474564117)
+and [CodeQL](https://github.com/vedansh-adepu/kvbench/actions/runs/37474564113)
+builds failed on GCC's conversion warning for invalid-enum test value 999.
+Commit `3d84eb2` uses representable uint8_t value 255, still an unsupported
+enumerator. Existing rejection assertions stay intact. One repair round resolved
+all failures. The release workflow did not run; no tags or merges were created.
+Real vLLM calibration and mutation testing remain pending/not run respectively.

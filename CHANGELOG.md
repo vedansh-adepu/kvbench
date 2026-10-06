@@ -53,5 +53,6 @@
 - SHA-pinned compiler matrix, analysis/coverage/fuzz/sanitizer workflows;
   gated release definitions, CodeQL, Scorecard and action dependency updates.
 
-Real vLLM calibration and remote CI are pending. Local ASan runtime startup is
-blocked; normal/UBSan, fuzzing, coverage and analysis results are documented.
+Real vLLM calibration is pending. Local macOS ASan runtime startup is blocked;
+Linux ASan/UBSan and the remote compiler, coverage, analysis, fuzz and CodeQL
+jobs passed. Measured results and run links are documented in docs/quality.md.

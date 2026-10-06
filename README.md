@@ -125,7 +125,7 @@ cache tensors. No API keys are needed. Timing coefficients are model inputs.
 - MLA weights require explicit size; its cache dimensions do not determine projections.
 - TP division examples omit replicated/padded tensors; verify real per-rank memory.
 - Prefix sharing, speculative decoding and distributed execution are not modeled.
-- Local ASan startup is blocked; remote compiler/security CI is not verified yet.
+- Local macOS ASan startup is blocked; Linux sanitizers and remote CI passed ([results](docs/quality.md)).
 - Bounded fuzzing and line coverage are evidence of tests, not an exhaustive proof.
 
 ## Roadmap
