@@ -1,0 +1,33 @@
+{
+  "schema_version": 2,
+  "model": {
+    "name": "qwen2.5-72b-like",
+    "num_layers": 80,
+    "num_attention_heads": 64,
+    "num_kv_heads": 8,
+    "head_dim": 128,
+    "hidden_size": 8192
+  },
+  "weights": {
+    "dtype": "bf16",
+    "intermediate_size": 29568,
+    "vocab_size": 152064,
+    "tie_word_embeddings": false
+  },
+  "engine": {
+    "gpu_memory_utilization": 0.9,
+    "non_torch_overhead_gib": 0.25,
+    "activation_peak_gib": 1,
+    "cudagraph_memory_gib": 0.5,
+    "block_size": 16,
+    "kv_dtype": "bf16"
+  },
+  "hardware": {
+    "total_gpu_gib": 80
+  },
+  "workload": {
+    "context_tokens": 8192,
+    "decode_tokens": 512,
+    "concurrent_requests": 1
+  }
+}

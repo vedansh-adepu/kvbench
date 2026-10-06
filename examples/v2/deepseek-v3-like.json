@@ -1,0 +1,32 @@
+{
+  "schema_version": 2,
+  "model": {
+    "name": "deepseek-v3-like cache-only geometry (weights excluded)",
+    "num_layers": 61,
+    "num_attention_heads": 128,
+    "num_kv_heads": 1,
+    "head_dim": 128,
+    "hidden_size": 7168,
+    "attention_type": "mla",
+    "kv_lora_rank": 512,
+    "qk_rope_head_dim": 64
+  },
+  "weights": {
+    "weights_bytes": 0
+  },
+  "engine": {
+    "gpu_memory_utilization": 1,
+    "non_torch_overhead_bytes": 0,
+    "activation_peak_bytes": 0,
+    "cudagraph_memory_bytes": 0,
+    "kv_dtype": "bf16"
+  },
+  "hardware": {
+    "total_gpu_gib": 4
+  },
+  "workload": {
+    "context_tokens": 2049,
+    "decode_tokens": 0,
+    "concurrent_requests": 1
+  }
+}

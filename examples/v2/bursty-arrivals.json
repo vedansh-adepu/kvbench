@@ -1,0 +1,49 @@
+{
+  "schema_version": 2,
+  "model": {
+    "name": "GQA arrival fixture (weights/runtime excluded)",
+    "num_layers": 32,
+    "num_attention_heads": 32,
+    "num_kv_heads": 8,
+    "head_dim": 128,
+    "hidden_size": 4096
+  },
+  "weights": {
+    "weights_bytes": 0
+  },
+  "engine": {
+    "gpu_memory_utilization": 1,
+    "non_torch_overhead_bytes": 0,
+    "activation_peak_bytes": 0,
+    "cudagraph_memory_bytes": 0,
+    "block_size": 16,
+    "kv_dtype": "bf16",
+    "max_num_seqs": 2,
+    "max_num_batched_tokens": 128,
+    "base_step_ms": 1,
+    "prefill_ms_per_token": 0.01,
+    "decode_ms_per_seq": 0.1
+  },
+  "hardware": {
+    "total_gpu_bytes": 83886080
+  },
+  "workload": {
+    "context_tokens": 512,
+    "decode_tokens": 64,
+    "concurrent_requests": 2,
+    "requests": [
+      {
+        "id": "first",
+        "arrival_ms": 0,
+        "input_tokens": 512,
+        "output_tokens": 64
+      },
+      {
+        "id": "second",
+        "arrival_ms": 0,
+        "input_tokens": 512,
+        "output_tokens": 64
+      }
+    ]
+  }
+}

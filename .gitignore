@@ -7,3 +7,15 @@ cmake-build-*/
 *.so
 *.exe
 Testing/
+build-*/
+.cache/
+coverage/
+*.gcda
+*.gcno
+*.profraw
+*.profdata
+fuzz-artifacts/
+*.sarif
+.env
+.env.*
+release-artifacts/
