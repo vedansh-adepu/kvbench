@@ -30,6 +30,7 @@ bool all_done(const std::vector<RuntimeRequest>& requests) {
 }  // namespace
 
 SchedulerResult simulate_scheduler(const Config& config) {
+  validate_config(config, "schedule");
   SchedulerResult result;
   std::vector<RuntimeRequest> requests;
   requests.reserve(config.requests.size());

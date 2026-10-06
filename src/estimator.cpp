@@ -98,6 +98,7 @@ double gb_to_bytes(double gb) {
 }
 
 Estimate estimate(const Config& config) {
+  validate_config(config, "estimate");
   Estimate result;
   result.model_name = config.model.name;
   result.layers = config.model.layers;

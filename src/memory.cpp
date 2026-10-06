@@ -44,6 +44,7 @@ Bytes layer_data_bytes(const CacheGeometry& geometry, const LayerSpec& layer, Co
 
 Bytes layer_metadata_bytes(const CacheGeometry& geometry, const LayerSpec& layer, Count tokens) {
   const auto& q = geometry.quantization;
+  if (q.scale_mode == ScaleMode::none || q.scale_mode == ScaleMode::per_tensor) return 0;
   const Bytes entry = checked_add(q.scale_bytes, q.zero_point_bytes);
   if (q.scale_mode == ScaleMode::per_token_head) {
     const Count heads = layer.kind == LayerKind::mla ? 1 : geometry.model.num_kv_heads;

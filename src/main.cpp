@@ -1,4 +1,9 @@
 #include <exception>
+#include <cmath>
+#include <limits>
+#include <sstream>
+#include <iomanip>
+#include <CLI/CLI.hpp>
 #include <iostream>
 #include <string>
 #include <utility>
@@ -14,10 +19,6 @@ constexpr auto kVersion = kvbench::version;
 
 struct Args {
   std::vector<std::string> values;
-
-  explicit Args(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) values.emplace_back(argv[i]);
-  }
 
   bool has(const std::string& flag) const {
     for (const auto& value : values) {
@@ -36,18 +37,6 @@ struct Args {
 
 [[noreturn]] void usage_error(const std::string& message) {
   throw std::runtime_error(message + "\nRun 'kvbench help' for usage.");
-}
-
-void print_usage() {
-  std::cout
-      << "kvbench " << kVersion << "\n\n"
-      << "Usage:\n"
-      << "  kvbench simulate --config <file> [--format text|json|markdown]\n"
-      << "  kvbench compare <config> [config...]\n"
-      << "  kvbench budget --config <file> --max-memory-gb <gb>\n"
-      << "  kvbench sweep --config <file> --batch-min <n> --batch-max <n> [--format table|csv]\n"
-      << "  kvbench graph --config <file> --format mermaid\n"
-      << "  kvbench version\n";
 }
 
 int run_simulate(const Args& args) {
@@ -81,6 +70,7 @@ int run_budget(const Args& args) {
 
   kvbench::Config config = kvbench::load_config_file(path);
   config.system.gpu_memory_gb = std::stod(max_memory);
+  kvbench::validate_config(config, "budget override");
   const kvbench::Estimate estimate = kvbench::estimate(config);
   std::cout << "budget: " << max_memory << " GiB total, "
             << kvbench::bytes_to_gb(estimate.usable_memory_bytes) << " GiB usable after reserved memory\n";
@@ -123,25 +113,61 @@ int run_graph(const Args& args) {
 }  // namespace
 
 int main(int argc, char** argv) {
+  CLI::App app{"Prototype kvbench CLI; v2 planner command migration follows core phases"};
+  app.require_subcommand(1);
+  std::string path;
+  std::string format;
+  std::vector<std::string> paths;
+  double budget_memory = 0;
+  int batch_min = 1;
+  int batch_max = 1;
+  auto* simulate = app.add_subcommand("simulate", "Static prototype estimate");
+  simulate->add_option("--config", path)->required();
+  simulate->add_option("--format", format)->check(CLI::IsMember({"text", "json", "markdown"}));
+  auto* compare = app.add_subcommand("compare", "Compare prototype configs");
+  compare->add_option("configs", paths)->required();
+  auto* budget = app.add_subcommand("budget", "Check prototype memory fit");
+  budget->add_option("--config", path)->required();
+  budget->add_option("--max-memory-gb", budget_memory)->required();
+  auto* sweep = app.add_subcommand("sweep", "Prototype coupled batch/concurrency sweep");
+  sweep->add_option("--config", path)->required();
+  sweep->add_option("--batch-min", batch_min)->required();
+  sweep->add_option("--batch-max", batch_max)->required();
+  sweep->add_option("--format", format)->check(CLI::IsMember({"table", "csv"}));
+  auto* graph = app.add_subcommand("graph", "Prototype memory graph");
+  graph->add_option("--config", path)->required();
+  graph->add_option("--format", format)->check(CLI::IsMember({"mermaid"}));
+  auto* version = app.add_subcommand("version", "Print version");
+  auto* help = app.add_subcommand("help", "Print help");
   try {
-    Args args(argc, argv);
-    if (args.values.empty() || args.values[0] == "help" || args.values[0] == "--help") {
-      print_usage();
-      return 0;
+    app.parse(argc, argv);
+    Args args;
+    if (*version) { std::cout << "kvbench " << kVersion << "\n"; return 0; }
+    if (*help) { std::cout << app.help(); return 0; }
+    if (*compare) { args.values = {"compare"}; args.values.insert(args.values.end(), paths.begin(), paths.end()); return run_compare(args); }
+    args.values = {"command", "--config", path};
+    if (!format.empty()) args.values.insert(args.values.end(), {"--format", format});
+    if (*simulate) return run_simulate(args);
+    if (*graph) return run_graph(args);
+    if (*budget) {
+      if (!std::isfinite(budget_memory) || budget_memory <= 0) throw std::invalid_argument("budget must be finite and positive");
+      std::ostringstream exact_budget;
+      exact_budget << std::setprecision(std::numeric_limits<double>::max_digits10) << budget_memory;
+      args.values.insert(args.values.end(), {"--max-memory-gb", exact_budget.str()});
+      return run_budget(args);
     }
-    const std::string command = args.values[0];
-    if (command == "version") {
-      std::cout << "kvbench " << kVersion << "\n";
-      return 0;
+    if (*sweep) {
+      args.values.insert(args.values.end(), {"--batch-min", std::to_string(batch_min), "--batch-max", std::to_string(batch_max)});
+      return run_sweep(args);
     }
-    if (command == "simulate") return run_simulate(args);
-    if (command == "compare") return run_compare(args);
-    if (command == "budget") return run_budget(args);
-    if (command == "sweep") return run_sweep(args);
-    if (command == "graph") return run_graph(args);
-    usage_error("unknown command: " + command);
+  } catch (const CLI::CallForHelp&) {
+    std::cout << app.help(); return 0;
+  } catch (const CLI::ParseError&) {
+    std::cerr << "error: invalid command or option; see --help\n"; return 2;
   } catch (const std::exception& error) {
-    std::cerr << "error: " << error.what() << "\n";
-    return 2;
+    std::string message = error.what();
+    const auto end = message.find_first_of("\r\n");
+    std::cerr << "error: " << message.substr(0, end) << "\n"; return 2;
   }
+  return 2;
 }
