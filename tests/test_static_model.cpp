@@ -1,20 +1,23 @@
-#include "kvbench/static_model.hpp"
-#include "kvbench/json.hpp"
-#include <limits>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <limits>
+
+#include "kvbench/json.hpp"
+#include "kvbench/static_model.hpp"
 
 namespace {
 kvbench::PlannerConfig toy() {
-  return kvbench::parse_planner_config(R"({"schema_version":2,"model":{"num_layers":2,"num_attention_heads":2,"num_kv_heads":1,"head_dim":2,"hidden_size":4},"weights":{"intermediate_size":8,"vocab_size":10},"engine":{"activation_peak_bytes":0,"block_size":1},"workload":{"context_tokens":1}})");
+  return kvbench::parse_planner_config(
+      R"({"schema_version":2,"model":{"num_layers":2,"num_attention_heads":2,"num_kv_heads":1,"head_dim":2,"hidden_size":4},"weights":{"intermediate_size":8,"vocab_size":10},"engine":{"activation_peak_bytes":0,"block_size":1},"workload":{"context_tokens":1}})");
 }
-}
+}  // namespace
 
 TEST_CASE("B1 prefill pages context independently of final tokens", "[static][golden]") {
-  auto c = kvbench::parse_planner_config(R"({"model":{"layers":1,"attention_heads":1,"kv_heads":1,"head_dim":1,"hidden_size":100,"dtype":"fp16"},"workload":{"context_tokens":17,"decode_tokens":15,"concurrent_requests":1,"batch_size":1,"prefill_chunk_size":100},"system":{"gpu_memory_gb":1,"reserved_memory_gb":0,"page_size_tokens":16}})");
+  auto c = kvbench::parse_planner_config(
+      R"({"model":{"layers":1,"attention_heads":1,"kv_heads":1,"head_dim":1,"hidden_size":100,"dtype":"fp16"},"workload":{"context_tokens":17,"decode_tokens":15,"concurrent_requests":1,"batch_size":1,"prefill_chunk_size":100},"system":{"gpu_memory_gb":1,"reserved_memory_gb":0,"page_size_tokens":16}})");
   const auto result = kvbench::estimate_static(c, 950);
-  REQUIRE(result.prefill_cache_bytes == 128); // ceil(17/16)*16*4, not reused 32-token padding.
-  REQUIRE(result.prefill_bytes == 978); // 128 + the explicit mapped 850-byte activation allowance.
+  REQUIRE(result.prefill_cache_bytes == 128);  // ceil(17/16)*16*4, not reused 32-token padding.
+  REQUIRE(result.prefill_bytes == 978);  // 128 + the explicit mapped 850-byte activation allowance.
   REQUIRE(result.decode_cache_bytes == 128);
   REQUIRE(result.peak_bytes == 978);
   REQUIRE_FALSE(result.fits);
@@ -47,10 +50,12 @@ TEST_CASE("B12 fit and risk agree at exact byte thresholds", "[static]") {
   auto e = kvbench::estimate_static(c, kvbench::sequence_cache_bytes(c.cache, 1));
   REQUIRE(e.fits);
   REQUIRE(e.risk == "at_capacity");
-  REQUIRE(memory_risk(std::numeric_limits<kvbench::Bytes>::max()-1, std::numeric_limits<kvbench::Bytes>::max()) == "critical");
+  REQUIRE(memory_risk(std::numeric_limits<kvbench::Bytes>::max() - 1,
+                      std::numeric_limits<kvbench::Bytes>::max()) == "critical");
 }
 
-TEST_CASE("Resident weight estimator matches explicit dense and MoE hand math", "[weights][golden]") {
+TEST_CASE("Resident weight estimator matches explicit dense and MoE hand math",
+          "[weights][golden]") {
   auto c = toy();
   // Embedding=40, final norm=4; per layer Q/O=32,K/V=16,MLP=96,norms=8.
   auto e = kvbench::estimate_weights(c);

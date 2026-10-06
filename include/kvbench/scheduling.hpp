@@ -3,10 +3,16 @@
 #include <optional>
 #include <string>
 #include <vector>
+
 #include "kvbench/budget.hpp"
 
 namespace kvbench {
-enum class CompletionStatus { completed, truncated_time, truncated_steps, infeasible };
+enum class CompletionStatus : std::uint8_t {
+  completed,
+  truncated_time,
+  truncated_steps,
+  infeasible
+};
 struct RequestMetrics {
   std::string id;
   double arrival_ms = 0;
@@ -56,4 +62,4 @@ using EventSink = std::function<void(const ScheduleStep&)>;
 ScheduleResult schedule(const PlannerConfig& config, const EventSink& sink = {});
 /// Stable completion spelling for versioned results.
 std::string completion_name(CompletionStatus status);
-}
+}  // namespace kvbench

@@ -1,10 +1,11 @@
 #pragma once
 #include <map>
+
 #include "kvbench/output.hpp"
 
 namespace kvbench {
 struct LogObservations {
-  std::map<std::string,Count> terms;
+  std::map<std::string, Count> terms;
   std::optional<double> utilization;
 };
 /// Map a strict Hugging Face config into a validated schema-v2 config object;
@@ -21,4 +22,4 @@ Json compare_calibration(const PlannerConfig& config, const LogObservations& obs
                          double tolerance_percent);
 /// Read a bounded text input without writes; maximum 16 MiB.
 std::string read_text_input(const std::string& path);
-}
+}  // namespace kvbench

@@ -7,8 +7,8 @@ are not given project warning flags. The package version comes from CMake and
 is generated into a header.
 
 FetchContent dependencies are pinned by tag-qualified archive URLs and SHA256:
-nlohmann/json 3.12.0, CLI11 2.5.0, Catch2 3.8.1. JSON/CLI integration replaces
-the prototype parser in P2; P0 only provisions their build targets.
+nlohmann/json 3.12.0, CLI11 2.5.0, Catch2 3.8.1. JSON and CLI parsing use those libraries; Catch2 is fetched only when tests
+are enabled.
 
 For an offline first configure, populate the three source directories from the
 verified archives, then pass `-DFETCHCONTENT_FULLY_DISCONNECTED=ON` and
@@ -22,5 +22,5 @@ preset output with `-B /path/outside/repository`.
 
 `asan-ubsan` enables ASan and non-recovering UBSan. `coverage` enables compiler
 coverage instrumentation. `fuzz` reserves the Clang/libFuzzer configuration;
-fuzz targets are added in P8. These presets are not evidence of successful CI
-or numerical correctness; test results must be measured separately.
+it builds the bounded config/log targets documented in [quality](quality.md).
+Presets are not evidence of successful CI or numerical correctness.

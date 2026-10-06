@@ -3,6 +3,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+
 #include "kvbench/memory.hpp"
 
 namespace kvbench {
@@ -65,4 +66,4 @@ PlannerConfig parse_planner_config(const std::string& source);
 PlannerConfig load_planner_config(const std::string& path);
 /// Validate mutable public configs, ranges and all checked count sums.
 void validate_planner_config(const PlannerConfig& config);
-}
+}  // namespace kvbench

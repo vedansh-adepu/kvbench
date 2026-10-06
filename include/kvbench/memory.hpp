@@ -24,9 +24,9 @@ Bytes gib_to_bytes(long double gib);
 /// Convert bytes to GiB for presentation only; calculation stays integer.
 long double bytes_to_gib(Bytes bytes);
 
-enum class CacheDType { fp32, fp16, bf16, fp8_e4m3, fp8_e5m2, int8, int4 };
-enum class LayerKind { full, sliding, mla };
-enum class ScaleMode { none, per_tensor, per_token_head, group };
+enum class CacheDType : std::uint8_t { fp32, fp16, bf16, fp8_e4m3, fp8_e5m2, int8, int4 };
+enum class LayerKind : std::uint8_t { full, sliding, mla };
+enum class ScaleMode : std::uint8_t { none, per_tensor, per_token_head, group };
 
 struct LayerSpec {
   LayerKind kind = LayerKind::full;

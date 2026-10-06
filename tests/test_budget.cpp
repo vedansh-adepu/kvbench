@@ -1,12 +1,14 @@
-#include "kvbench/budget.hpp"
-#include <limits>
 #include <catch2/catch_test_macros.hpp>
+#include <limits>
+
+#include "kvbench/budget.hpp"
 
 namespace {
 kvbench::PlannerConfig tiny() {
-  return kvbench::parse_planner_config(R"({"schema_version":2,"model":{"num_layers":1,"num_attention_heads":1,"num_kv_heads":1,"head_dim":1,"hidden_size":1},"weights":{"weights_bytes":100},"hardware":{"total_gpu_bytes":1000},"engine":{"gpu_memory_utilization":0.9,"non_torch_overhead_bytes":50,"activation_peak_bytes":100,"cudagraph_memory_bytes":50,"block_size":16},"workload":{"context_tokens":17,"decode_tokens":15}})");
+  return kvbench::parse_planner_config(
+      R"({"schema_version":2,"model":{"num_layers":1,"num_attention_heads":1,"num_kv_heads":1,"head_dim":1,"hidden_size":1},"weights":{"weights_bytes":100},"hardware":{"total_gpu_bytes":1000},"engine":{"gpu_memory_utilization":0.9,"non_torch_overhead_bytes":50,"activation_peak_bytes":100,"cudagraph_memory_bytes":50,"block_size":16},"workload":{"context_tokens":17,"decode_tokens":15}})");
 }
-}
+}  // namespace
 
 TEST_CASE("Budget subtracts each resident/runtime term exactly once", "[budget]") {
   const auto b = kvbench::estimate_budget(tiny());
@@ -66,7 +68,7 @@ TEST_CASE("Constant scales reduce pool capacity once", "[budget]") {
   const auto b = kvbench::estimate_budget(c);
   REQUIRE(b.cache.constant_metadata_bytes == 8);
   REQUIRE(b.cache.bytes_per_block == 32);
-  REQUIRE(b.num_blocks == 2); // floor((100-8)/32).
+  REQUIRE(b.num_blocks == 2);  // floor((100-8)/32).
 }
 
 TEST_CASE("Budget supports representable maximal bytes without FP conversion UB", "[budget]") {
@@ -79,7 +81,8 @@ TEST_CASE("Budget supports representable maximal bytes without FP conversion UB"
 }
 
 TEST_CASE("Golden 4 GiB block pool matches exact GQA capacity", "[budget][golden]") {
-  auto c = kvbench::parse_planner_config(R"({"schema_version":2,"model":{"num_layers":32,"num_attention_heads":32,"num_kv_heads":8,"head_dim":128},"weights":{"weights_bytes":0},"hardware":{"total_gpu_gib":4},"engine":{"gpu_memory_utilization":1,"non_torch_overhead_bytes":0,"activation_peak_bytes":0,"cudagraph_memory_bytes":0},"workload":{"context_tokens":2049}})");
+  auto c = kvbench::parse_planner_config(
+      R"({"schema_version":2,"model":{"num_layers":32,"num_attention_heads":32,"num_kv_heads":8,"head_dim":128},"weights":{"weights_bytes":0},"hardware":{"total_gpu_gib":4},"engine":{"gpu_memory_utilization":1,"non_torch_overhead_bytes":0,"activation_peak_bytes":0,"cudagraph_memory_bytes":0},"workload":{"context_tokens":2049}})");
   const auto b = kvbench::estimate_budget(c);
   REQUIRE(b.kv_pool_bytes == kvbench::gib_to_bytes(4));
   REQUIRE(b.num_blocks == 2048);

@@ -1,0 +1,3 @@
+Available KV cache memory: 4 GiB
+GPU KV cache size: 32,768 tokens
+# GPU blocks: 2048

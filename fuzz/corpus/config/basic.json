@@ -1,0 +1,1 @@
+{"schema_version":2,"model":{"num_layers":1,"num_attention_heads":1,"head_dim":1},"weights":{"weights_bytes":0},"engine":{"activation_peak_bytes":0,"non_torch_overhead_bytes":0,"cudagraph_memory_bytes":0}}

@@ -1,6 +1,7 @@
 #pragma once
 #include <optional>
 #include <string>
+
 #include "kvbench/planner_config.hpp"
 
 namespace kvbench {
@@ -33,4 +34,4 @@ std::string memory_risk(Bytes required, Bytes available);
 /// when the true capacity is greater. Never silently cap or wrap capacity.
 StaticEstimate estimate_static(const PlannerConfig& config, Bytes available_bytes,
                                std::optional<Count> max_concurrency = std::nullopt);
-}
+}  // namespace kvbench

@@ -1,13 +1,105 @@
 {
   "version": 2,
-  "cmakeMinimumRequired": {"major": 3, "minor": 20, "patch": 0},
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 20,
+    "patch": 0
+  },
   "configurePresets": [
-    {"name": "dev", "generator": "Ninja", "binaryDir": "${sourceDir}/build-dev", "cacheVariables": {"CMAKE_BUILD_TYPE": "Debug", "KVBENCH_WARNINGS_AS_ERRORS": "ON"}},
-    {"name": "release", "inherits": "dev", "binaryDir": "${sourceDir}/build-release", "cacheVariables": {"CMAKE_BUILD_TYPE": "Release"}},
-    {"name": "asan-ubsan", "inherits": "dev", "binaryDir": "${sourceDir}/build-asan-ubsan", "cacheVariables": {"KVBENCH_SANITIZERS": "ON"}},
-    {"name": "coverage", "inherits": "dev", "binaryDir": "${sourceDir}/build-coverage", "cacheVariables": {"KVBENCH_COVERAGE": "ON"}},
-    {"name": "fuzz", "inherits": "dev", "binaryDir": "${sourceDir}/build-fuzz", "cacheVariables": {"CMAKE_CXX_COMPILER": "clang++", "KVBENCH_FUZZ": "ON"}}
+    {
+      "name": "dev",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-dev",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "KVBENCH_WARNINGS_AS_ERRORS": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "dev",
+      "binaryDir": "${sourceDir}/build-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "asan-ubsan",
+      "inherits": "dev",
+      "binaryDir": "${sourceDir}/build-asan-ubsan",
+      "cacheVariables": {
+        "KVBENCH_SANITIZERS": "ON"
+      }
+    },
+    {
+      "name": "coverage",
+      "inherits": "dev",
+      "binaryDir": "${sourceDir}/build-coverage",
+      "cacheVariables": {
+        "KVBENCH_COVERAGE": "ON"
+      }
+    },
+    {
+      "name": "fuzz",
+      "inherits": "dev",
+      "binaryDir": "${sourceDir}/build-fuzz",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "clang++",
+        "KVBENCH_FUZZ": "ON",
+        "BUILD_TESTING": "OFF"
+      }
+    }
   ],
-  "buildPresets": [{"name":"dev","configurePreset":"dev"},{"name":"release","configurePreset":"release"},{"name":"asan-ubsan","configurePreset":"asan-ubsan"},{"name":"coverage","configurePreset":"coverage"},{"name":"fuzz","configurePreset":"fuzz"}],
-  "testPresets": [{"name":"dev","configurePreset":"dev","output":{"outputOnFailure":true}},{"name":"release","configurePreset":"release","output":{"outputOnFailure":true}},{"name":"asan-ubsan","configurePreset":"asan-ubsan","output":{"outputOnFailure":true}},{"name":"coverage","configurePreset":"coverage","output":{"outputOnFailure":true}}]
+  "buildPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "asan-ubsan",
+      "configurePreset": "asan-ubsan"
+    },
+    {
+      "name": "coverage",
+      "configurePreset": "coverage"
+    },
+    {
+      "name": "fuzz",
+      "configurePreset": "fuzz"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "asan-ubsan",
+      "configurePreset": "asan-ubsan",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "coverage",
+      "configurePreset": "coverage",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
 }

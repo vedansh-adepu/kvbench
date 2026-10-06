@@ -27,4 +27,4 @@ BudgetResult estimate_budget(const PlannerConfig& config,
 /// Return whole aggregate pool bundles required for one paged sequence.
 /// Hybrid allocations round up the sum of independently capped layer bytes.
 Count sequence_pool_blocks(const CacheGeometry& geometry, Count tokens);
-}
+}  // namespace kvbench
