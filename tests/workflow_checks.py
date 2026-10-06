@@ -16,3 +16,13 @@ assert "if: vars.KVBENCH_RELEASE_ENABLED == 'true'" in release
 assert "environment: release" in release and "--expected-tag" in release
 assert "contents: write" not in release
 print("SHA pins, least permissions and tag-only opt-in/environment release checks passed")
+
+ci = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+sanitizer = ci.split("  sanitizer:\n", 1)[1].split("  coverage:\n", 1)[0]
+assert "runs-on: ubuntu-latest" in sanitizer
+assert "ASAN_OPTIONS: detect_leaks=1:abort_on_error=1" in sanitizer
+assert "UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1" in sanitizer
+assert "ctest --preset asan-ubsan" in sanitizer
+assert "-R " not in sanitizer and "-E " not in sanitizer
+assert "--exclude-throw-branches --exclude-unreachable-branches" in ci
+assert "--json-summary coverage.json" in ci and "coverage-filtered.json" in ci

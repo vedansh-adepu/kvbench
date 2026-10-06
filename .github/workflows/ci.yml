@@ -33,6 +33,9 @@ jobs:
       - run: ctest --preset release
   sanitizer:
     runs-on: ubuntu-latest
+    env:
+      ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: sudo apt-get update && sudo apt-get install -y clang ninja-build
@@ -51,12 +54,15 @@ jobs:
       - run: cmake --build --preset coverage --parallel 4
       - run: ctest --preset coverage
       - run: gcovr --root . --filter 'src/' --fail-under-line 90 --json-summary coverage.json --txt coverage.txt build-coverage
+      - run: gcovr --root . --filter 'src/' --exclude-throw-branches --exclude-unreachable-branches --json-summary coverage-filtered.json --txt coverage-filtered.txt build-coverage
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage
           path: |
             coverage.json
             coverage.txt
+            coverage-filtered.json
+            coverage-filtered.txt
   analysis:
     runs-on: ubuntu-latest
     steps:

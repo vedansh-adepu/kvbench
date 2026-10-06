@@ -86,3 +86,24 @@ test time (`-DCMAKE_CATCH_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST`). Test discove
 still hung at local ASan runtime startup; the bounded 10-second attempt was
 stopped. ASan execution remains UNVERIFIED. Remote compiler/scanner/sanitizer
 jobs and real-engine calibration remain pending. Mutation testing was skipped.
+
+## Raw and filtered branch reporting
+
+The raw branch figure is retained. C++ coverage can count compiler-generated
+exception/unwinding edges from operations that may throw as well as source-level
+decisions. Such edges increase the denominator, and many are not exercised by
+ordinary success paths. gcovr's classification is compiler/coverage-format
+dependent; filtering does not turn this into proof of decision coverage.
+
+CI also reports a separate figure using
+`--exclude-throw-branches --exclude-unreachable-branches`, with separate JSON/text
+artifacts. Neither branch figure is gated. On the same local P11 counters, raw
+coverage is 2275/4278 = 53.2%; filtered coverage is 2260/4244 = 53.3%. This small
+change is the actual AppleClang result; it is not replaced by a more flattering
+number. The line gate remains 90% and both branch figures remain visible.
+
+The Linux ASan+UBSan job runs the full CTest preset with
+`ASAN_OPTIONS=detect_leaks=1:abort_on_error=1` and
+`UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1`, including test discovery/build.
+The observed ASan hang is a macOS-local limitation until Linux evidence says
+otherwise; the Linux job is not skipped or reduced.
