@@ -198,10 +198,11 @@ TEST_CASE("Every memory entry validates caller-mutated geometry", "[memory][vali
       g.model.attention_type = LayerKind::mla;
       break;
     case 7:
-      g.quantization.dtype = static_cast<CacheDType>(999);
+      // 255 fits uint8_t but is not a supported enumerator; no narrowing overflow.
+      g.quantization.dtype = static_cast<CacheDType>(255);
       break;
     case 8:
-      g.quantization.scale_mode = static_cast<ScaleMode>(999);
+      g.quantization.scale_mode = static_cast<ScaleMode>(255);
       break;
     case 9:
       g.quantization.dtype = CacheDType::int8;
@@ -212,7 +213,7 @@ TEST_CASE("Every memory entry validates caller-mutated geometry", "[memory][vali
       g.quantization.scale_mode = ScaleMode::per_tensor;
       break;
     case 11:
-      g.model.attention_type = static_cast<LayerKind>(999);
+      g.model.attention_type = static_cast<LayerKind>(255);
       break;
     default:
       FAIL("unknown fixture");
