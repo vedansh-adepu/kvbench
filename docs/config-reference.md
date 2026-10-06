@@ -43,8 +43,8 @@ All values below are planning defaults, not calibration evidence.
 | num_shared_experts | 0 | 0–65536 |
 | quantization_overhead_bytes | 0 bytes | Explicit uint64 checkpoint metadata allowance |
 
-The weight estimator is added in P3. These fields are parsed and validated now;
-no current prototype estimate silently applies them.
+The [weight estimator](static-model.md) uses these fields. The prototype CLI
+is transitional and does not silently apply schema-v2 fields.
 
 ## Hardware and engine
 
