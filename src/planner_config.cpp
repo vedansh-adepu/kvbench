@@ -155,7 +155,8 @@ PlannerConfig parse_planner_config(const std::string& source) {
   c.weights.quantization_overhead_bytes = count(w, "quantization_overhead_bytes", 0);
   const auto& e = !legacy && root.contains("engine") ? root.at("engine") : empty;
   keys(e,
-       {"gpu_memory_utilization",
+       {"vllm_compat", "max_model_len", "tensor_parallel_size", "available_kv_pool_bytes",
+        "gpu_memory_utilization",
         "non_torch_overhead_bytes",
         "non_torch_overhead_gib",
         "activation_peak_bytes",
@@ -182,6 +183,11 @@ PlannerConfig parse_planner_config(const std::string& source) {
         "calibrated"},
        "engine", false, c.warnings);
   auto& engine = c.engine;
+  engine.vllm_compat = flag(e, "vllm_compat", false);
+  engine.max_model_len = count(e, "max_model_len", 0);
+  engine.tensor_parallel_size = count(e, "tensor_parallel_size", 1);
+  if (e.contains("available_kv_pool_bytes"))
+    engine.available_kv_pool_bytes = integer(e.at("available_kv_pool_bytes"), "available_kv_pool_bytes");
   engine.gpu_memory_utilization =
       number(e, "gpu_memory_utilization", engine.gpu_memory_utilization);
   engine.non_torch_overhead_bytes =
@@ -302,6 +308,27 @@ void validate_planner_config(const PlannerConfig& c) {
   if (!std::isfinite(c.engine.gpu_memory_utilization) || c.engine.gpu_memory_utilization <= 0 ||
       c.engine.gpu_memory_utilization > 1)
     throw JsonError("gpu_memory_utilization must be finite in (0,1]");
+  if (!c.engine.vllm_compat && (c.engine.available_kv_pool_bytes ||
+      c.engine.max_model_len || c.engine.tensor_parallel_size != 1))
+    throw JsonError("vLLM capacity inputs require vllm_compat");
+  if (c.engine.vllm_compat) {
+    positive(c.engine.max_model_len, std::numeric_limits<Count>::max(), "max_model_len");
+    if (checked_add(c.workload.context_tokens, c.workload.decode_tokens) > c.engine.max_model_len)
+      throw JsonError("workload length exceeds max_model_len");
+    positive(c.engine.tensor_parallel_size, c.cache.model.num_attention_heads, "tensor_parallel_size");
+    if (c.engine.tensor_parallel_size > 1 && !c.engine.available_kv_pool_bytes &&
+        !c.weights.weights_bytes)
+      throw JsonError("TP compatibility needs explicit per-rank weights or pool bytes");
+    const Count heads = c.cache.model.num_kv_heads, tp = c.engine.tensor_parallel_size;
+    if (c.cache.model.num_attention_heads % tp ||
+        (heads >= tp && heads % tp) || (heads < tp && tp % heads))
+      throw JsonError("KV heads must divide TP or be divisible by TP");
+    if (c.cache.model.attention_type != LayerKind::full || !c.cache.model.layers.empty() ||
+        c.cache.quantization.scale_mode != ScaleMode::none ||
+        c.cache.quantization.dtype == CacheDType::int8 ||
+        c.cache.quantization.dtype == CacheDType::int4)
+      throw JsonError("vllm_compat requires one uniform full-attention group without scale metadata");
+  }
   positive(c.engine.max_num_seqs, 1'000'000, "max_num_seqs");
   positive(c.engine.max_num_batched_tokens, 1'000'000'000, "max_num_batched_tokens");
   positive(c.engine.max_steps, std::numeric_limits<Count>::max(), "max_steps");

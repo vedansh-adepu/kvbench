@@ -9,30 +9,48 @@ Count sequence_pool_blocks(const CacheGeometry& geometry, Count tokens) {
   return ceil_div(sequence_cache_bytes(geometry, tokens), cache_layout(geometry).bytes_per_block);
 }
 
-BudgetResult estimate_budget(const PlannerConfig& c, std::optional<Count> max_concurrency) {
-  validate_planner_config(c);
+BudgetResult estimate_budget(const PlannerConfig& input, std::optional<Count> max_concurrency) {
+  validate_planner_config(input);
+  auto c = input;
+  if (c.engine.vllm_compat) {
+    c.cache.model.num_kv_heads = std::max(Count{1}, c.cache.model.num_kv_heads /
+                                                   c.engine.tensor_parallel_size);
+    c.engine.tensor_parallel_size = 1;  // Geometry is now per rank.
+  }
   BudgetResult b;
   b.total_gpu_bytes = c.total_gpu_bytes;
-  // Avoid rounding UINT64_MAX to 2^64 on platforms with double-width long double.
-  if (c.engine.gpu_memory_utilization == 1.0)
-    b.utilization_bytes = c.total_gpu_bytes;
-  else {
-    const long double usable =
-        static_cast<long double>(c.total_gpu_bytes) * c.engine.gpu_memory_utilization;
-    if (!std::isfinite(usable) || usable >= std::ldexp(1.0L, 64))
-      throw std::overflow_error("utilization budget exceeds uint64 bytes");
-    b.utilization_bytes = static_cast<Bytes>(usable);
+  if (c.engine.available_kv_pool_bytes) {
+    b.kv_pool_bytes = *c.engine.available_kv_pool_bytes;
+    b.overheads_fit = true;
+    c.engine.activation_peak_bytes = 0;
+  } else {
+    // Avoid rounding UINT64_MAX to 2^64 on platforms with double-width long double.
+    if (c.engine.vllm_compat) {
+      const double usable = std::ceil(static_cast<double>(c.total_gpu_bytes) *
+                                      c.engine.gpu_memory_utilization);
+      if (!std::isfinite(usable) || usable >= std::ldexp(1.0, 64))
+        throw std::overflow_error("utilization budget exceeds uint64 bytes");
+      b.utilization_bytes = static_cast<Bytes>(usable);
+    } else if (c.engine.gpu_memory_utilization == 1.0)
+      b.utilization_bytes = c.total_gpu_bytes;
+    else {
+      const long double usable =
+          static_cast<long double>(c.total_gpu_bytes) * c.engine.gpu_memory_utilization;
+      if (!std::isfinite(usable) || usable >= std::ldexp(1.0L, 64))
+        throw std::overflow_error("utilization budget exceeds uint64 bytes");
+      b.utilization_bytes = static_cast<Bytes>(usable);
+    }
+    b.weights = estimate_weights(c);
+    b.non_torch_overhead_bytes = c.engine.non_torch_overhead_bytes;
+    b.activation_peak_bytes = c.engine.activation_peak_bytes;
+    b.cudagraph_memory_bytes = c.engine.cudagraph_memory_bytes;
+    const Bytes non_activation = checked_add(checked_add(b.weights.bytes, b.non_torch_overhead_bytes),
+                                             b.cudagraph_memory_bytes);
+    const Bytes all_overhead = checked_add(non_activation, b.activation_peak_bytes);
+    b.overheads_fit = all_overhead <= b.utilization_bytes;
+    b.overhead_deficit_bytes = b.overheads_fit ? 0 : checked_sub(all_overhead, b.utilization_bytes);
+    b.kv_pool_bytes = b.overheads_fit ? checked_sub(b.utilization_bytes, all_overhead) : 0;
   }
-  b.weights = estimate_weights(c);
-  b.non_torch_overhead_bytes = c.engine.non_torch_overhead_bytes;
-  b.activation_peak_bytes = c.engine.activation_peak_bytes;
-  b.cudagraph_memory_bytes = c.engine.cudagraph_memory_bytes;
-  const Bytes non_activation = checked_add(checked_add(b.weights.bytes, b.non_torch_overhead_bytes),
-                                           b.cudagraph_memory_bytes);
-  const Bytes all_overhead = checked_add(non_activation, b.activation_peak_bytes);
-  b.overheads_fit = all_overhead <= b.utilization_bytes;
-  b.overhead_deficit_bytes = b.overheads_fit ? 0 : checked_sub(all_overhead, b.utilization_bytes);
-  b.kv_pool_bytes = b.overheads_fit ? checked_sub(b.utilization_bytes, all_overhead) : 0;
   b.cache = cache_layout(c.cache);
   b.num_blocks = pool_block_capacity(c.cache, b.kv_pool_bytes);
   if (c.engine.num_blocks) {
@@ -40,7 +58,17 @@ BudgetResult estimate_budget(const PlannerConfig& c, std::optional<Count> max_co
       throw std::invalid_argument("num_blocks override exceeds the memory budget");
     b.num_blocks = *c.engine.num_blocks;
   }
-  b.max_tokens_in_cache = checked_mul(b.num_blocks, c.cache.block_size);
+  if (c.engine.vllm_compat) {
+    if (b.num_blocks > (Count{1} << 53) || c.engine.max_model_len > (Count{1} << 53))
+      throw std::overflow_error("vLLM report inputs exceed exact double integer range");
+    b.vllm_concurrency = static_cast<double>(b.num_blocks) /
+                         static_cast<double>(ceil_div(c.engine.max_model_len, c.cache.block_size));
+    const double tokens = b.vllm_concurrency * static_cast<double>(c.engine.max_model_len);
+    if (!std::isfinite(tokens) || tokens >= std::ldexp(1.0, 64))
+      throw std::overflow_error("vLLM reported tokens exceed uint64");
+    b.max_tokens_in_cache = static_cast<Count>(tokens);
+  } else
+    b.max_tokens_in_cache = checked_mul(b.num_blocks, c.cache.block_size);
   b.blocks_per_sequence = sequence_pool_blocks(
       c.cache, checked_add(c.workload.context_tokens, c.workload.decode_tokens));
   b.max_concurrent_sequences = b.num_blocks / b.blocks_per_sequence;

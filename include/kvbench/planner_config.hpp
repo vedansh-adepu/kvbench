@@ -20,6 +20,10 @@ struct WeightSpec {
 };
 struct EngineSpec {
   double gpu_memory_utilization = 0.9;
+  bool vllm_compat = false;
+  Count max_model_len = 0;
+  Count tensor_parallel_size = 1;
+  std::optional<Bytes> available_kv_pool_bytes;
   Bytes non_torch_overhead_bytes = gibibyte / 4;
   Bytes activation_peak_bytes = gibibyte;
   Bytes cudagraph_memory_bytes = gibibyte / 2;

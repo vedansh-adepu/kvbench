@@ -14,14 +14,16 @@ struct BudgetResult {
   CacheLayout cache;
   Count num_blocks = 0;
   Count max_tokens_in_cache = 0;
+  double vllm_concurrency = 0;
   Count blocks_per_sequence = 0;
   Count max_concurrent_sequences = 0;
   bool overheads_fit = false;
   StaticEstimate workload;
 };
-/// vLLM-style memory budget in checked uint64 bytes. Utilization rounds down;
-/// subtract weights and each explicit overhead once. Insufficient budget yields
-/// zero KV pool and a deficit, not unsigned wrap. Block override must fit pool.
+/// Checked memory budget. Default utilization rounds down; vllm_compat rounds up.
+/// Subtract weights and each explicit overhead once unless an exact pool is supplied.
+/// Insufficient budget yields zero KV pool and a deficit, not unsigned wrap.
+/// Block override must fit pool.
 BudgetResult estimate_budget(const PlannerConfig& config,
                              std::optional<Count> max_concurrency = std::nullopt);
 /// Return whole aggregate pool bundles required for one paged sequence.
