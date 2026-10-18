@@ -1,5 +1,7 @@
 #include "kvbench/output.hpp"
 
+#include <iomanip>
+#include <locale>
 #include <sstream>
 #include <stdexcept>
 
@@ -58,7 +60,8 @@ void flatten(const Json& value, const std::string& path,
     rows.emplace_back(path, value.is_string() ? value.get<std::string>() : value.dump());
 }
 }  // namespace
-Json budget_report(const PlannerConfig& c, const BudgetResult& b, const std::string& command) {
+static Json base_budget_report(const PlannerConfig& c, const BudgetResult& b,
+                               const std::string& command) {
   return {{"kvbench_result", 2},
           {"command", command},
           {"model_name", c.model_name},
@@ -97,6 +100,27 @@ Json budget_report(const PlannerConfig& c, const BudgetResult& b, const std::str
             {"risk", b.workload.risk},
             {"max_concurrency", b.workload.max_concurrency},
             {"max_concurrency_is_lower_bound", b.workload.concurrency_bounded}}}};
+}
+Json budget_report(const PlannerConfig& c, const BudgetResult& b, const std::string& command) {
+  Json report = base_budget_report(c, b, command);
+  if (c.engine.vllm_compat) {
+    const auto comma = [](Count n) {
+      std::string s = std::to_string(n);
+      for (std::size_t i = s.size(); i > 3; i -= 3) s.insert(i - 3, ",");
+      return s;
+    };
+    std::ostringstream line;
+    line.imbue(std::locale::classic());
+    line << "Maximum concurrency for " << comma(c.engine.max_model_len)
+         << " tokens per request: " << std::fixed << std::setprecision(2)
+         << b.vllm_concurrency << 'x';
+    report["vllm_capacity"] = {
+        {"max_concurrency", b.vllm_concurrency},
+        {"log_lines", Json::array({"GPU KV cache size: " + comma(b.max_tokens_in_cache) +
+                                  " tokens", line.str()})},
+        {"exact_pool_input", c.engine.available_kv_pool_bytes.has_value()}};
+  }
+  return report;
 }
 Json schedule_report(const PlannerConfig& c, const BudgetResult& b, const ScheduleResult& r) {
   Json j = budget_report(c, b, "schedule");

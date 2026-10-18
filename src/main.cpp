@@ -130,6 +130,8 @@ int run_cli(int argc, char** argv) {
       return 0;
     }
     auto c = load(path);
+    if (c.engine.vllm_compat && !*budget)
+      throw std::invalid_argument("vllm_compat supports budget, compare and calibrate only");
     if (batch_tokens) c.engine.max_num_batched_tokens = *batch_tokens;
     if (memory_gib && memory_bytes) throw std::invalid_argument("choose one memory override");
     if (memory_gib) {

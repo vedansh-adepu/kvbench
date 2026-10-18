@@ -1,5 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <limits>
+#include <cmath>
+
+#include "kvbench/output.hpp"
 
 #include "kvbench/budget.hpp"
 
@@ -89,4 +92,118 @@ TEST_CASE("Golden 4 GiB block pool matches exact GQA capacity", "[budget][golden
   REQUIRE(b.blocks_per_sequence == 129);
   REQUIRE(b.max_concurrent_sequences == 15);
   REQUIRE(b.max_tokens_in_cache == 32768);
+}
+
+TEST_CASE("vLLM mode preserves defaults and uses double ceil", "[budget][vllm]") {
+  auto c = tiny();
+  c.total_gpu_bytes = 1001;
+  REQUIRE(kvbench::estimate_budget(c).utilization_bytes == 900);
+  REQUIRE_FALSE(kvbench::budget_report(c, kvbench::estimate_budget(c), "budget")
+                    .contains("vllm_capacity"));
+  c.engine.vllm_compat = true;
+  c.engine.max_model_len = 33;
+  REQUIRE(kvbench::estimate_budget(c).utilization_bytes == 901);
+  c.total_gpu_bytes = 1000;
+  REQUIRE(kvbench::estimate_budget(c).utilization_bytes == 900);
+}
+
+TEST_CASE("Exact vLLM input bypasses unused overheads and reports fractional capacity",
+          "[budget][vllm]") {
+  auto c = tiny();
+  c.engine.vllm_compat = true;
+  c.engine.max_model_len = 33;
+  c.engine.available_kv_pool_bytes = 128;
+  c.weights.weights_bytes = std::numeric_limits<kvbench::Bytes>::max();
+  c.engine.activation_peak_bytes = std::numeric_limits<kvbench::Bytes>::max();
+  const auto b = kvbench::estimate_budget(c);
+  REQUIRE(b.kv_pool_bytes == 128);
+  REQUIRE(b.num_blocks == 2);
+  REQUIRE(b.max_tokens_in_cache == 22);  // int((2 / ceil(33/16)) * 33).
+  REQUIRE(std::abs(b.vllm_concurrency - 2.0 / 3) < 1e-12);
+  REQUIRE(b.weights.bytes == 0);
+  const auto j = kvbench::budget_report(c, b, "budget");
+  REQUIRE_FALSE(j["vllm_capacity"].contains("log_line"));
+  REQUIRE(j["vllm_capacity"]["log_lines"] == kvbench::Json::array({
+          "GPU KV cache size: 22 tokens",
+          "Maximum concurrency for 33 tokens per request: 0.67x"}));
+  c.engine.available_kv_pool_bytes = 0;
+  REQUIRE(kvbench::estimate_budget(c).vllm_concurrency == 0);
+  c.engine.vllm_compat = false;
+  REQUIRE_THROWS(kvbench::estimate_budget(c));
+}
+
+TEST_CASE("Compatibility resolves replicated and sharded per-rank KV heads", "[budget][vllm]") {
+  auto c = tiny();
+  c.cache.model.num_attention_heads = 8;
+  c.cache.model.num_kv_heads = 2;
+  c.engine.vllm_compat = true;
+  c.engine.max_model_len = 32;
+  c.engine.available_kv_pool_bytes = 1024;
+  c.engine.tensor_parallel_size = 8;
+  REQUIRE(kvbench::estimate_budget(c).num_blocks == 16);  // One replicated KV head.
+  c.engine.tensor_parallel_size = 1;
+  REQUIRE(kvbench::estimate_budget(c).num_blocks == 8);
+  c.cache.model.num_kv_heads = 6;
+  c.engine.tensor_parallel_size = 2;
+  REQUIRE(kvbench::estimate_budget(c).num_blocks == 5);  // Three KV heads per rank.
+  c.engine.tensor_parallel_size = 4;
+  REQUIRE_THROWS(kvbench::estimate_budget(c));
+  c.engine.tensor_parallel_size = 1;
+  c.cache.model.attention_type = kvbench::LayerKind::sliding;
+  c.cache.model.sliding_window = 32;
+  REQUIRE_THROWS(kvbench::estimate_budget(c));
+}
+
+TEST_CASE("Three published logs are conditional memory-rounding interval checks",
+          "[budget][vllm][interval]") {
+  // Issues 50705, 52802, 39010 in vllm-project/vllm. Assumed block size 16
+  // and dense layout; config/backend provenance is not established by this test.
+  struct Case {
+    kvbench::Count layers, heads, kv_heads, dim, tp, length, tokens;
+    long double gib;
+    double concurrency;
+    kvbench::CacheDType dtype;
+  };
+  for (const auto& row : {
+      Case{24, 14, 2, 64, 1, 1024, 9668416, 55.32L, 9441.81, kvbench::CacheDType::fp8_e4m3},
+      Case{28, 16, 8, 128, 1, 40960, 129744, 13.86L, 3.17, kvbench::CacheDType::bf16},
+      Case{40, 32, 8, 128, 2, 128000, 311264, 11.87L, 2.43, kvbench::CacheDType::fp8_e4m3}}) {
+    auto c = tiny();
+    c.cache.model.num_layers = row.layers;
+    c.cache.model.num_attention_heads = row.heads;
+    c.cache.model.num_kv_heads = row.kv_heads;
+    c.cache.model.head_dim = row.dim;
+    c.cache.quantization.dtype = row.dtype;
+    c.engine.vllm_compat = true;
+    c.engine.tensor_parallel_size = row.tp;
+    c.engine.max_model_len = row.length;
+    c.engine.available_kv_pool_bytes = static_cast<kvbench::Bytes>(
+        std::ceil((row.gib - 0.005L) * kvbench::gibibyte));
+    const auto lo = kvbench::estimate_budget(c);
+    c.engine.available_kv_pool_bytes = static_cast<kvbench::Bytes>(
+        std::floor((row.gib + 0.005L) * kvbench::gibibyte));
+    const auto hi = kvbench::estimate_budget(c);
+    REQUIRE(lo.max_tokens_in_cache <= row.tokens);
+    REQUIRE(row.tokens <= hi.max_tokens_in_cache);
+    REQUIRE(lo.vllm_concurrency <= row.concurrency + 0.005);
+    REQUIRE(row.concurrency - 0.005 <= hi.vllm_concurrency);
+  }
+}
+
+TEST_CASE("Compatibility inputs remain strict and checked", "[budget][vllm]") {
+  REQUIRE_THROWS(kvbench::parse_planner_config(
+      R"({"schema_version":2,"model":{"num_layers":1,"num_attention_heads":1,"head_dim":1},"engine":{"vllm_compat":true,"max_model_len":1,"available_kv_pool_bytes":1.5}})"));
+  auto c = tiny();
+  c.engine.vllm_compat = true;
+  REQUIRE_THROWS(kvbench::estimate_budget(c));
+  c.engine.max_model_len = 1;
+  REQUIRE_THROWS(kvbench::estimate_budget(c));
+  c.workload.context_tokens = 1;
+  c.workload.decode_tokens = 0;
+  c.total_gpu_bytes = std::numeric_limits<kvbench::Bytes>::max();
+  c.engine.gpu_memory_utilization = 1;
+  REQUIRE_THROWS_AS(kvbench::estimate_budget(c), std::overflow_error);
+  c.engine.available_kv_pool_bytes = 64;
+  c.engine.max_model_len = (kvbench::Count{1} << 53) + 1;
+  REQUIRE_THROWS_AS(kvbench::estimate_budget(c), std::overflow_error);
 }
