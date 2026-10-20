@@ -1,4 +1,4 @@
-# 0004 — Deterministic bounded scheduler
+# 0004: Deterministic bounded scheduler
 
 Schedule decodes first, then FCFS prefills. Preempt the latest admitted running
 request and recompute its context. Time is a configurable model, and events are

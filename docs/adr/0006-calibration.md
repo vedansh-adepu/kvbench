@@ -1,4 +1,4 @@
-# 0006 — Calibration provenance remains explicit
+# 0006: Calibration provenance remains explicit
 
 Compare predictions with supplied single-worker startup observations. Missing
 terms stay missing; public logs with unknown configurations are parsing fixtures

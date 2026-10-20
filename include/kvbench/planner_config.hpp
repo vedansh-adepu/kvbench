@@ -21,6 +21,7 @@ struct WeightSpec {
 struct EngineSpec {
   double gpu_memory_utilization = 0.9;
   bool vllm_compat = false;
+  std::string vllm_report_style = "combined";
   Count max_model_len = 0;
   Count tensor_parallel_size = 1;
   std::optional<Bytes> available_kv_pool_bytes;

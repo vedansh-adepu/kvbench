@@ -1,4 +1,4 @@
-# 0005 — Separate static and scheduled answers
+# 0005: Separate static and scheduled answers
 
 Static output is a phase-paged worst case for specified concurrency/context;
 scheduled output uses actual arrivals and admission. Never take the maximum

@@ -155,7 +155,7 @@ PlannerConfig parse_planner_config(const std::string& source) {
   c.weights.quantization_overhead_bytes = count(w, "quantization_overhead_bytes", 0);
   const auto& e = !legacy && root.contains("engine") ? root.at("engine") : empty;
   keys(e,
-       {"vllm_compat", "max_model_len", "tensor_parallel_size", "available_kv_pool_bytes",
+       {"vllm_compat", "vllm_report_style", "max_model_len", "tensor_parallel_size", "available_kv_pool_bytes",
         "gpu_memory_utilization",
         "non_torch_overhead_bytes",
         "non_torch_overhead_gib",
@@ -184,6 +184,7 @@ PlannerConfig parse_planner_config(const std::string& source) {
        "engine", false, c.warnings);
   auto& engine = c.engine;
   engine.vllm_compat = flag(e, "vllm_compat", false);
+  engine.vllm_report_style = text(e, "vllm_report_style", "combined");
   engine.max_model_len = count(e, "max_model_len", 0);
   engine.tensor_parallel_size = count(e, "tensor_parallel_size", 1);
   if (e.contains("available_kv_pool_bytes"))
@@ -309,8 +310,11 @@ void validate_planner_config(const PlannerConfig& c) {
       c.engine.gpu_memory_utilization > 1)
     throw JsonError("gpu_memory_utilization must be finite in (0,1]");
   if (!c.engine.vllm_compat && (c.engine.available_kv_pool_bytes ||
-      c.engine.max_model_len || c.engine.tensor_parallel_size != 1))
+      c.engine.max_model_len || c.engine.tensor_parallel_size != 1 ||
+      c.engine.vllm_report_style != "combined"))
     throw JsonError("vLLM capacity inputs require vllm_compat");
+  if (c.engine.vllm_report_style != "combined" && c.engine.vllm_report_style != "split")
+    throw JsonError("vllm_report_style must be combined or split");
   if (c.engine.vllm_compat) {
     positive(c.engine.max_model_len, std::numeric_limits<Count>::max(), "max_model_len");
     if (checked_add(c.workload.context_tokens, c.workload.decode_tokens) > c.engine.max_model_len)

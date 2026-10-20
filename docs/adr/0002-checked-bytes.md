@@ -1,4 +1,4 @@
-# 0002 — Checked uint64 bytes
+# 0002: Checked uint64 bytes
 
 Use integer bytes/counts internally with checked addition, multiplication and
 subtraction. GiB inputs round down to bytes; packed int4 planes round up their
