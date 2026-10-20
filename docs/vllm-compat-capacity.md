@@ -5,9 +5,25 @@ mode and output schema remain unchanged. The compatibility mode uses vLLM's
 double multiplication followed by ceil for the utilization budget, and reports
 `C = num_blocks / ceil(max_model_len / block_size)` and `int(C * max_model_len)`.
 `vllm_capacity.max_concurrency` is the fractional ratio; `log_lines` is an array
-of the two separate vLLM strings, with comma-grouped tokens and two-decimal
-concurrency, as in the pinned
+with comma-grouped tokens and two-decimal concurrency, as in the pinned
 [vLLM capacity specification](vllm-capacity-model.md).
+
+`engine.vllm_report_style` selects `combined` (default, one array element) or
+`split` (two elements, for older versions). Select the style explicitly when
+reproducing an older report; no version is inferred from model configuration.
+The combined message first appears in stable release
+[v0.28.0, lines 1869-1875](https://github.com/vllm-project/vllm/blob/v0.28.0/vllm/v1/core/kv_cache_utils.py#L1869-L1875).
+The preceding stable release
+[v0.27.1, lines 2235-2240](https://github.com/vllm-project/vllm/blob/v0.27.1/vllm/v1/core/kv_cache_utils.py#L2235-L2240)
+has two logging calls. Pinned
+[v0.32.0, lines 2327-2334](https://github.com/vllm-project/vllm/blob/v0.32.0/vllm/v1/core/kv_cache_utils.py#L2327-L2334)
+uses the combined form:
+
+```text
+GPU KV cache size: <tokens with commas> tokens, Maximum concurrency for <max_model_len with commas> tokens per request: <C to 2 decimals>x
+```
+
+The split form is:
 
 ```text
 GPU KV cache size: <tokens with commas> tokens

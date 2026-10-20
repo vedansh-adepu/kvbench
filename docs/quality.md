@@ -108,7 +108,7 @@ The Linux ASan+UBSan job runs the full CTest preset with
 The observed ASan hang is a macOS-local limitation until Linux evidence says
 otherwise; the Linux job is not skipped or reduced.
 
-## Verified remote results — 2026-10-06
+## Verified remote results: 2026-10-06
 
 Measured implementation: `3d84eb2`. All eight jobs passed in
 [CI run 37475033670](https://github.com/vedansh-adepu/kvbench/actions/runs/37475033670),

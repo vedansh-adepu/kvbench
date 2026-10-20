@@ -124,8 +124,15 @@ TEST_CASE("Exact vLLM input bypasses unused overheads and reports fractional cap
   const auto j = kvbench::budget_report(c, b, "budget");
   REQUIRE_FALSE(j["vllm_capacity"].contains("log_line"));
   REQUIRE(j["vllm_capacity"]["log_lines"] == kvbench::Json::array({
+          "GPU KV cache size: 22 tokens, Maximum concurrency for 33 tokens per request: 0.67x"}));
+  c.engine.vllm_report_style = "split";
+  const auto split = kvbench::budget_report(c, b, "budget");
+  REQUIRE(split["vllm_capacity"]["log_lines"] == kvbench::Json::array({
           "GPU KV cache size: 22 tokens",
           "Maximum concurrency for 33 tokens per request: 0.67x"}));
+  c.engine.vllm_report_style = "invalid";
+  REQUIRE_THROWS(kvbench::estimate_budget(c));
+  c.engine.vllm_report_style = "combined";
   c.engine.available_kv_pool_bytes = 0;
   REQUIRE(kvbench::estimate_budget(c).vllm_concurrency == 0);
   c.engine.vllm_compat = false;

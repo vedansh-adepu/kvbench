@@ -1,4 +1,4 @@
-# 0003 — Explicit vLLM-style budget
+# 0003: Explicit vLLM-style budget
 
 Subtract weights and separate non-torch, activation and graph allowances from
 the utilization budget, then floor whole cache blocks. Defaults are explicitly

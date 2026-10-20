@@ -114,10 +114,14 @@ Json budget_report(const PlannerConfig& c, const BudgetResult& b, const std::str
     line << "Maximum concurrency for " << comma(c.engine.max_model_len)
          << " tokens per request: " << std::fixed << std::setprecision(2)
          << b.vllm_concurrency << 'x';
+    const std::string capacity = "GPU KV cache size: " + comma(b.max_tokens_in_cache) +
+                                 " tokens";
+    const Json lines = c.engine.vllm_report_style == "combined"
+                           ? Json::array({capacity + ", " + line.str()})
+                           : Json::array({capacity, line.str()});
     report["vllm_capacity"] = {
         {"max_concurrency", b.vllm_concurrency},
-        {"log_lines", Json::array({"GPU KV cache size: " + comma(b.max_tokens_in_cache) +
-                                  " tokens", line.str()})},
+        {"log_lines", lines},
         {"exact_pool_input", c.engine.available_kv_pool_bytes.has_value()}};
   }
   return report;
