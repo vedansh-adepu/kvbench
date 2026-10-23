@@ -8,6 +8,16 @@ This is interval consistency, not exact capacity validation or a GPU experiment.
 The centre residual has an unexplained directional imbalance; no correction
 was fitted.
 
+## Reproduction
+
+Run `python3 scripts/reproduce_published_logs.py --check` from a checkout.
+The standard-library script reads [the admitted inputs](published-log-inputs.csv),
+recomputes the interval and sign tables, and compares them with this document.
+Geometry is transcribed from the config snapshots cited below, identified by
+SHA-256; no network or GPU is needed. `python3 tests/published_log_checks.py`
+also checks boundary and failure cases. Output remains conditional on the
+source/layout/config assumptions described here.
+
 ## Method and completeness
 
 The admission rule requires a reported vLLM version, model and captured
