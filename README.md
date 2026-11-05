@@ -8,7 +8,8 @@ block budgeting with weights and runtime overheads, simulates continuous batchin
 with block admission, chunked prefill and recompute preemption, and compares its
 predictions with a supplied vLLM startup log. Arrival patterns change pool
 occupancy and preemptions. It is a planning model, not an inference engine or a
-hardware benchmark. **Calibration evidence is pending.**
+hardware benchmark. **The timing model is UNCALIBRATED; exact GPU validation
+and calibration remain pending.**
 
 ## Why I built it
 
@@ -101,7 +102,25 @@ Use a local HF config to import architecture, then supply checkpoint weights and
 runtime inputs from your actual engine. `calibrate` compares observed startup
 memory/block/token terms with predictions; missing terms remain missing.
 See [calibration](docs/calibration.md). The public discussion fixture tests parsing
-only, because its exact model/config is unknown. No accuracy claim is made.
+only, because its exact model/config is unknown. This fixture makes no accuracy
+claim; the separate published-log evidence is described in [Validation](#validation).
+
+## Validation
+
+[Published-log validation](docs/published-log-validation.md) finds capacity
+arithmetic interval-consistent with 14 admitted published records (13 unique
+input-observation tuples, 6 issue clusters), under the stated source/layout/config
+assumptions. This is not exact-byte validation, profile estimation or calibration.
+Exact GPU validation is pending. The centre residuals retain an unexplained
+negative skew; no correction was fitted. The timing model stays **UNCALIBRATED**.
+
+The [capacity model](docs/vllm-capacity-model.md) and
+[compatibility contract](docs/vllm-compat-capacity.md) explain the inputs and
+version-specific report semantics. Reproduce the published tables offline:
+
+```sh
+python3 scripts/reproduce_published_logs.py --check
+```
 
 ## How it compares
 
@@ -140,3 +159,5 @@ MIT. See [LICENSE](LICENSE).
 [Configuration](docs/config-reference.md) · [Quality](docs/quality.md) ·
 [CPU performance](docs/performance.md) · [ADRs](docs/adr/0001-dependencies.md) ·
 [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
+
+Developed with AI coding assistance; every change is reviewed by the author.
